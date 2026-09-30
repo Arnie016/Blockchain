@@ -13,7 +13,7 @@ canvas{display:block}
 #hud{position:fixed;inset:0;pointer-events:none;font-size:13px}
 .tl{position:absolute;left:16px;top:calc(16px + env(safe-area-inset-top,0px));display:grid;gap:6px}
 .br{position:absolute;right:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));text-align:right;display:grid;gap:4px}
-.bl{position:absolute;left:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));color:var(--dim);font-size:11px;line-height:1.6;max-width:calc(100% - 180px)}
+.bl{position:absolute;left:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));color:var(--dim);font-size:11px;line-height:1.6;max-width:calc(100% - 300px)}
 .bar{width:180px;height:8px;background:#ffffff18;border:1px solid #ffffff30}
 .bar>i{display:block;height:100%;background:var(--moss);transition:width .2s}
 .lbl{letter-spacing:.12em;text-transform:uppercase;font-size:10px;color:var(--dim)}
@@ -23,6 +23,14 @@ canvas{display:block}
 #cross{position:absolute;left:50%;top:50%;width:4px;height:4px;margin:-2px;border-radius:50%;background:var(--ink);box-shadow:0 0 0 6px #e8e1cf22}
 #hurt{position:absolute;inset:0;box-shadow:inset 0 0 180px var(--blood);opacity:0;transition:opacity .3s}
 #stealth{color:var(--moss)}
+#compass{position:absolute;left:50%;top:calc(14px + env(safe-area-inset-top,0px));transform:translateX(-50%);width:min(60vw,520px);height:22px;border-bottom:1px solid #e8e1cf40;overflow:hidden;
+  background:linear-gradient(90deg,transparent,#0d100c66 20%,#0d100c66 80%,transparent)}
+#compass b{position:absolute;top:2px;transform:translateX(-50%);font-weight:400;font-size:11px;letter-spacing:.1em;color:var(--dim)}
+#compass b.tw{color:var(--moss)}#compass b.pt{color:#d8a640}
+#listen{position:absolute;inset:0;background:radial-gradient(ellipse,transparent 40%,#000a);opacity:0;transition:opacity .3s}
+#ellie{color:#d9a38a;font-family:var(--display);font-size:14px;position:absolute;left:50%;bottom:calc(64px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);opacity:0;transition:opacity .4s;text-shadow:0 2px 6px #000;width:min(90%,560px);text-align:center}
+#prompt{position:absolute;left:50%;top:58%;transform:translateX(-50%);font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink);text-shadow:0 1px 4px #000}
+#bolt{position:absolute;inset:0;background:#dfe8ff;opacity:0;pointer-events:none}
 #menu{position:fixed;inset:0;display:grid;place-items:center;background:radial-gradient(ellipse at 50% 40%,#1b2214cc,#050604f2);pointer-events:auto;padding:16px}
 #menu .card{max-width:520px;display:grid;gap:14px}
 #menu h1{font-family:var(--display);font-weight:400;font-size:clamp(34px,8vw,56px);margin:0;line-height:1;color:var(--ink);text-wrap:balance}
@@ -42,17 +50,17 @@ canvas{display:block}
   </div>
   <div class="br">
     <div class="lbl">Revolver</div><div class="big" id="ammo">6 · 12</div>
-    <div class="lbl" id="inv">Rags 0 · Alcohol 0 · Medkits 1</div>
+    <div class="lbl" id="inv2"></div><div class="lbl" id="inv">Rags 0 · Alcohol 0 · Medkits 1</div>
   </div>
-  <div class="bl">WASD move · mouse look · click shoot · R reload · Shift sprint (loud) · C crouch (quiet) · E loot · Q craft medkit · H heal · F flashlight</div>
-  <div id="cross"></div><div id="hurt"></div><div id="msg"></div>
+  <div class="bl">WASD move · mouse look · click shoot · R reload · Shift sprint · C crouch · E loot · G throw brick · V stealth kill · hold Tab listen · Q medkit · H heal · F light</div>
+  <div id="compass"></div><div id="listen"></div><div id="bolt"></div><div id="ellie"></div><div id="prompt"></div><div id="cross"></div><div id="hurt"></div><div id="msg"></div>
 </div>
 
 <div id="menu"><div class="card">
   <div class="lbl">Boston QZ outskirts · 20 years after outbreak</div>
   <h1>Over<span>growth</span></h1>
   <p>The city has gone to moss and spores. Scavenge five radio parts from the wreckage, then reach the signal tower to call the Fireflies.</p>
-  <p>Runners see you. Clickers are blind but hear everything: sprinting and gunshots draw them. Crouch with <kbd>C</kbd> to slip past.</p>
+  <p>Runners see you. Clickers are blind but hear everything: sprinting and gunshots draw them. Crouch with <kbd>C</kbd>, throw bricks with <kbd>G</kbd> to lure them away, and hold <kbd>Tab</kbd> to listen through walls. Ellie is with you. Keep her close.</p>
   <button id="go">Enter the city</button>
 </div></div>
 
@@ -171,15 +179,15 @@ tower.position.set(0,0,-95);scene.add(tower);solids.push({x0:-1.5,x1:1.5,z0:-96.
 const loot=[];
 function freeSpot(minR=10){for(let k=0;k<200;k++){const x=(R()-.5)*190,z=(R()-.5)*190;if(Math.hypot(x,z)<minR)continue;if(!solids.some(s=>x>s.x0-1.5&&x<s.x1+1.5&&z>s.z0-1.5&&z<s.z1+1.5))return[x,z]}return[20,20]}
 function addLoot(kind){
-  const col={part:0xd8a640,rags:0xcfc6b0,alcohol:0x6aa0c0,ammo:0xb87a3a}[kind];
+  const col={part:0xd8a640,rags:0xcfc6b0,alcohol:0x6aa0c0,ammo:0xb87a3a,brick:0x9a4a32,blade:0xc8ccd0}[kind];
   const m=new THREE.Mesh(kind=='part'?new THREE.BoxGeometry(.6,.4,.6):new THREE.CylinderGeometry(.18,.18,.5,8),new THREE.MeshStandardMaterial({color:col,emissive:col,emissiveIntensity:.35,roughness:.5,metalness:kind=='part'?.6:0}));
   const [x,z]=freeSpot(kind=='part'?25:8);m.position.set(x,.5,z);m.castShadow=true;scene.add(m);
   const glow=new THREE.PointLight(col,.8,5);glow.position.y=.6;m.add(glow);loot.push({m,kind});
 }
-for(let i=0;i<5;i++)addLoot('part');for(let i=0;i<10;i++)addLoot('rags');for(let i=0;i<8;i++)addLoot('alcohol');for(let i=0;i<9;i++)addLoot('ammo');
+for(let i=0;i<5;i++)addLoot('part');for(let i=0;i<10;i++)addLoot('rags');for(let i=0;i<8;i++)addLoot('alcohol');for(let i=0;i<9;i++)addLoot('ammo');for(let i=0;i<12;i++)addLoot('brick');for(let i=0;i<6;i++)addLoot('blade');
 
 /* ---------- player ---------- */
-const P={x:0,z:10,yaw:Math.PI,pitch:-.1,hp:100,mag:6,ammo:12,rags:0,alc:0,med:1,parts:0,crouch:false,sprint:false,bob:0,hurtT:0,alive:true,won:false};
+const P={x:0,z:10,yaw:Math.PI,pitch:-.1,hp:100,mag:6,ammo:12,rags:0,alc:0,med:1,parts:0,bricks:1,shivs:1,listen:false,crouch:false,sprint:false,bob:0,hurtT:0,alive:true,won:false};
 const flash=new THREE.SpotLight(0xfff0c8,0,40,.45,.5,1.4);flash.castShadow=true;scene.add(flash,flash.target);let flashOn=false;
 // held revolver in view
 const gun=new THREE.Group();
@@ -195,17 +203,46 @@ const enemies=[];
 function makeInfected(type){
   const g=new THREE.Group(),sk=M(T.skin);
   const body=new THREE.Mesh(new THREE.CylinderGeometry(.32,.26,1.1,8),sk);body.position.y=1.05;
-  const head=new THREE.Mesh(new THREE.SphereGeometry(.24,10,8),type=='clicker'?M(T.fungus):sk);head.position.y=1.85;
-  if(type=='clicker'){for(let i=0;i<7;i++){const f=new THREE.Mesh(new THREE.ConeGeometry(.08+R()*.08,.3+R()*.3,5),M(T.fungus));f.position.set((R()-.5)*.35,1.9+R()*.2,(R()-.5)*.35);f.rotation.set((R()-.5)*1.6,0,(R()-.5)*1.6);g.add(f)}}
+  const big=type=='bloater';if(big)g.scale.set(1.45,1.3,1.45);
+  const head=new THREE.Mesh(new THREE.SphereGeometry(.24,10,8),type!='runner'?M(T.fungus):sk);head.position.y=1.85;
+  if(big){for(let i=0;i<14;i++){const f=new THREE.Mesh(new THREE.IcosahedronGeometry(.15+R()*.2,0),M(T.fungus));const a=R()*6.28,h=.6+R()*1.4;f.position.set(Math.cos(a)*.34,h,Math.sin(a)*.34);g.add(f)}}
+  if(type!='runner'){for(let i=0;i<7;i++){const f=new THREE.Mesh(new THREE.ConeGeometry(.08+R()*.08,.3+R()*.3,5),M(T.fungus));f.position.set((R()-.5)*.35,1.9+R()*.2,(R()-.5)*.35);f.rotation.set((R()-.5)*1.6,0,(R()-.5)*1.6);g.add(f)}}
   else{const eyes=new THREE.Mesh(new THREE.BoxGeometry(.22,.04,.05),new THREE.MeshBasicMaterial({color:0xd0c070}));eyes.position.set(0,1.88,-.22);g.add(eyes)}
   const legs=[-1,1].map(s=>{const l=new THREE.Mesh(new THREE.CylinderGeometry(.1,.08,.9,6),sk);l.position.set(.14*s,.45,0);g.add(l);return l});
   const arms=[-1,1].map(s=>{const a=new THREE.Mesh(new THREE.CylinderGeometry(.07,.06,.8,6),sk);a.position.set(.4*s,1.2,-.1);a.rotation.x=-.6;g.add(a);return a});
   g.add(body,head);g.traverse(o=>{if(o.isMesh)o.castShadow=true});
   const [x,z]=freeSpot(28);g.position.set(x,0,z);scene.add(g);
-  const e={g,type,legs,arms,head,hp:type=='clicker'?3:2,state:'wander',tx:x,tz:z,t:R()*10,alert:0,dead:false,atk:0};
-  g.traverse(o=>{if(o.isMesh)o.userData.e=e});enemies.push(e);
+  const e={g,type,legs,arms,head,hp:type=='bloater'?12:type=='clicker'?3:2,stun:0,throwT:3,state:'wander',tx:x,tz:z,t:R()*10,alert:0,dead:false,atk:0};
+  g.traverse(o=>{if(o.isMesh)o.userData.e=e});
+  const sil=new THREE.Mesh(new THREE.CylinderGeometry(.35,.3,1.9,8),new THREE.MeshBasicMaterial({color:type=='runner'?0xe8e1cf:0xff9a6a,transparent:true,opacity:.55,depthTest:false}));sil.position.y=1;sil.renderOrder=9;sil.visible=false;g.add(sil);e.sil=sil;
+  enemies.push(e);
 }
-for(let i=0;i<14;i++)makeInfected('runner');for(let i=0;i<9;i++)makeInfected('clicker');
+for(let i=0;i<14;i++)makeInfected('runner');for(let i=0;i<9;i++)makeInfected('clicker');for(let i=0;i<3;i++)makeInfected('bloater');
+
+/* ---------- Ellie ---------- */
+const ellie=(()=>{const g=new THREE.Group(),skin=new THREE.MeshStandardMaterial({color:0xc99a7a,roughness:.8}),shirt=new THREE.MeshStandardMaterial({color:0x7a3b32,roughness:.9}),jeans=new THREE.MeshStandardMaterial({color:0x2e3a4a,roughness:.9}),hair=new THREE.MeshStandardMaterial({color:0x4a2a18,roughness:1});
+  const body=new THREE.Mesh(new THREE.CylinderGeometry(.22,.2,.7,8),shirt);body.position.y=1.0;
+  const head=new THREE.Mesh(new THREE.SphereGeometry(.17,12,10),skin);head.position.y=1.5;
+  const hr=new THREE.Mesh(new THREE.SphereGeometry(.18,12,10,0,6.3,0,1.7),hair);hr.position.y=1.53;
+  const tail=new THREE.Mesh(new THREE.ConeGeometry(.06,.25,6),hair);tail.position.set(0,1.45,.2);tail.rotation.x=2.6;
+  const pack=new THREE.Mesh(new THREE.BoxGeometry(.32,.38,.16),new THREE.MeshStandardMaterial({color:0x5a5a3a,roughness:1}));pack.position.set(0,1.05,.2);
+  const legs=[-1,1].map(s=>{const l=new THREE.Mesh(new THREE.CylinderGeometry(.08,.07,.7,6),jeans);l.position.set(.1*s,.35,0);g.add(l);return l});
+  const arms=[-1,1].map(s=>{const a=new THREE.Mesh(new THREE.CylinderGeometry(.05,.05,.55,6),shirt);a.position.set(.28*s,1.02,0);g.add(a);return a});
+  g.add(body,head,hr,tail,pack);g.traverse(o=>{if(o.isMesh)o.castShadow=true});g.position.set(1.5,0,12);scene.add(g);
+  return {g,legs,arms,t:0,cd:6,talkT:8};})();
+const ellieLines=['Smells like mushrooms and bad decisions.','Hey, did you ever see a movie? Like, in a theater?','Endure and survive, right?','Okay. Okay. I can do this.','That building looks like it is about to eat us.','If a clicker grabs me, I am haunting you.','Do you hear that? No? Good.'];
+function ellieSay(t,d=3.5){$('ellie').textContent='Ellie: '+t;$('ellie').style.opacity=1;ellieT=d}
+let ellieT=0;
+/* ---------- thrown objects, spores, rain ---------- */
+const projs=[];const brickGeo=new THREE.BoxGeometry(.22,.1,.12),brickMat=new THREE.MeshStandardMaterial({color:0x9a4a32,roughness:1});
+function lob(from,to,speed,kind){const m=new THREE.Mesh(kind=='spore'?new THREE.SphereGeometry(.22,8,6):brickGeo,kind=='spore'?new THREE.MeshBasicMaterial({color:0xb8c060}):brickMat);m.position.copy(from);scene.add(m);
+  const d=new THREE.Vector3().subVectors(to,from);const h=Math.hypot(d.x,d.z),T=Math.max(.5,h/speed);projs.push({m,kind,v:new THREE.Vector3(d.x/T,(d.y+9.8*T*T/2)/T,d.z/T)})}
+const burst=[];function sporeCloud(x,z){const g=new THREE.Mesh(new THREE.SphereGeometry(1,12,8),new THREE.MeshBasicMaterial({color:0xa8b050,transparent:true,opacity:.5,depthWrite:false}));g.position.set(x,.8,z);scene.add(g);burst.push({m:g,t:1.4})}
+const rainN=2500,rainG=new THREE.BufferGeometry(),rainP=new Float32Array(rainN*6);
+for(let i=0;i<rainN;i++){const x=(R()-.5)*80,y=R()*30,z=(R()-.5)*80;rainP.set([x,y,z,x+.05,y-.7,z],i*6)}
+rainG.setAttribute('position',new THREE.BufferAttribute(rainP,3));
+const rain=new THREE.LineSegments(rainG,new THREE.LineBasicMaterial({color:0xa8b4b0,transparent:true,opacity:0}));rain.frustumCulled=false;scene.add(rain);
+let weather=0,weatherT=40,boltT=8;
 
 /* ---------- audio (synth) ---------- */
 let AC;function snd(type){if(!AC)return;const t=AC.currentTime,o=AC.createOscillator(),g=AC.createGain();o.connect(g);g.connect(AC.destination);
@@ -213,6 +250,9 @@ let AC;function snd(type){if(!AC)return;const t=AC.currentTime,o=AC.createOscill
   if(type=='click'){o.type='square';o.frequency.setValueAtTime(900+R()*600,t);g.gain.setValueAtTime(.05,t);g.gain.exponentialRampToValueAtTime(.001,t+.04);o.start(t);o.stop(t+.05);return}
   if(type=='screech'){o.type='sawtooth';o.frequency.setValueAtTime(500,t);o.frequency.linearRampToValueAtTime(220,t+.5);g.gain.setValueAtTime(.08,t);g.gain.linearRampToValueAtTime(0,t+.5);o.start(t);o.stop(t+.5);return}
   if(type=='pick'){o.type='triangle';o.frequency.setValueAtTime(520,t);o.frequency.setValueAtTime(780,t+.07);g.gain.setValueAtTime(.08,t);g.gain.linearRampToValueAtTime(0,t+.18);o.start(t);o.stop(t+.2);return}
+  if(type=='clang'){o.type='square';o.frequency.setValueAtTime(260,t);o.frequency.exponentialRampToValueAtTime(90,t+.25);g.gain.setValueAtTime(.12,t);g.gain.exponentialRampToValueAtTime(.001,t+.3);o.start(t);o.stop(t+.3);return}
+  if(type=='pop'){o.type='sine';o.frequency.setValueAtTime(90,t);o.frequency.exponentialRampToValueAtTime(40,t+.4);g.gain.setValueAtTime(.3,t);g.gain.exponentialRampToValueAtTime(.001,t+.4);o.start(t);o.stop(t+.4);return}
+  if(type=='thunder'){const b=AC.createBuffer(1,AC.sampleRate*2.5,AC.sampleRate),d=b.getChannelData(0);let l=0;for(let i=0;i<d.length;i++){l=(l+.08*(R()*2-1))/1.08;d[i]=l*6*Math.pow(1-i/d.length,2)}const s2=AC.createBufferSource();s2.buffer=b;s2.connect(g);g.gain.value=.5;s2.start();return}
   if(type=='hurt'){o.type='sine';o.frequency.setValueAtTime(120,t);g.gain.setValueAtTime(.25,t);g.gain.linearRampToValueAtTime(0,t+.2);o.start(t);o.stop(t+.2)}
 }
 function ambience(){const b=AC.createBuffer(1,AC.sampleRate*4,AC.sampleRate),d=b.getChannelData(0);let l=0;for(let i=0;i<d.length;i++){l=(l+.02*(R()*2-1))/1.02;d[i]=l*3}
@@ -223,6 +263,9 @@ const keys={};let started=false,msgT=0;
 addEventListener('keydown',e=>{keys[e.code]=true;if(!started||!P.alive)return;
   if(e.code=='KeyC')P.crouch=!P.crouch;
   if(e.code=='KeyF'){flashOn=!flashOn}
+  if(e.code=='KeyG')throwBrick();
+  if(e.code=='KeyV')takedown();
+  if(e.code=='Tab')e.preventDefault();
   if(e.code=='KeyR')reload();
   if(e.code=='KeyE')pickup();
   if(e.code=='KeyQ'){if(P.rags>=1&&P.alc>=1){P.rags--;P.alc--;P.med++;say('Crafted a medkit.');snd('pick')}else say('Need 1 rag and 1 alcohol to craft.')}
@@ -238,20 +281,29 @@ addEventListener('mouseup',()=>drag=false);
 /* ---------- actions ---------- */
 function say(t,d=2.5){$('msg').textContent=t;$('msg').style.opacity=1;msgT=d}
 let heard0={x:0,z:0,r:0};
-function makeNoise(r){heard0={x:P.x,z:P.z,r}}
+function makeNoise(r,x=P.x,z=P.z){heard0={x,z,r}}
 let shotCd=0;const ray=new THREE.Raycaster();
 function shoot(){if(!P.alive||P.won||shotCd>0)return;
   if(P.mag<=0){snd('click');say('Empty. Press R.',1.2);return}
   P.mag--;shotCd=.45;snd('shot');muzzle.intensity=6;gun.rotation.x=.35;makeNoise(40);
   ray.setFromCamera({x:0,y:0},cam);const hits=ray.intersectObjects(enemies.filter(e=>!e.dead).map(e=>e.g),true);
-  if(hits.length&&hits[0].distance<60){const e=hits[0].object.userData.e;const head=hits[0].object===e.head;e.hp-=head?3:1;e.state='chase';e.alert=10;
-    if(e.hp<=0){e.dead=true;e.g.rotation.x=-Math.PI/2;e.g.position.y=.3;say(head?'Headshot.':'Down.',1)}}
+  if(hits.length&&hits[0].distance<60){const e=hits[0].object.userData.e;const head=hits[0].object===e.head;e.hp-=head?3:1;e.state='chase';e.alert=10;e.tx=P.x;e.tz=P.z;
+    if(e.hp<=0){e.dead=true;e.g.rotation.x=-Math.PI/2;e.g.position.y=.3;e.sil.visible=false;say(head?'Headshot.':'Down.',1)}}
 }
+function throwBrick(){if(P.bricks<=0){say('No bricks. Find some in the rubble.',1.5);return}P.bricks--;
+  const fwd=new THREE.Vector3(0,0,-1).applyQuaternion(cam.quaternion);const to=cam.position.clone().addScaledVector(fwd,Math.max(6,Math.min(22,14+fwd.y*20)));to.y=0;
+  lob(cam.position.clone().add(new THREE.Vector3(0,-.2,0)),to,18,'brick');}
+function takedown(){let best=null,bd=1.9;for(const e of enemies){if(e.dead)continue;const d=Math.hypot(e.g.position.x-P.x,e.g.position.z-P.z);if(d<bd){bd=d;best=e}}
+  if(!best){say('Get closer.',1);return}
+  if(best.type=='bloater'){say('Too big to take down quietly.',1.5);return}
+  if(best.state=='chase'&&best.stun<=0){say('It sees you coming. Stun it first.',1.5);return}
+  if(best.type=='clicker'){if(P.shivs<=0){say('Clickers need a shiv.',1.5);return}P.shivs--}
+  best.dead=true;best.g.rotation.x=-Math.PI/2;best.g.position.y=.3;best.sil.visible=false;snd('pick');say(best.type=='clicker'?'Shivved.':'Strangled. Quietly.',1.2);makeNoise(3)}
 function reload(){const n=Math.min(6-P.mag,P.ammo);if(n>0){P.mag+=n;P.ammo-=n;say('Reloaded.',1)}}
 function pickup(){let best=null,bd=2.6;for(const l of loot){const d=Math.hypot(l.m.position.x-P.x,l.m.position.z-P.z);if(d<bd){bd=d;best=l}}
   if(!best){return}scene.remove(best.m);loot.splice(loot.indexOf(best),1);snd('pick');
   if(best.kind=='part'){P.parts++;say(P.parts<5?`Radio part ${P.parts} of 5.`:'All parts found. Get to the signal tower (north).',3.5)}
-  if(best.kind=='rags'){P.rags++;say('Rags.',1)}if(best.kind=='alcohol'){P.alc++;say('Alcohol.',1)}if(best.kind=='ammo'){P.ammo+=4;say('+4 rounds.',1)}
+  if(best.kind=='rags'){P.rags++;say('Rags.',1)}if(best.kind=='alcohol'){P.alc++;say('Alcohol.',1)}if(best.kind=='ammo'){P.ammo+=4;say('+4 rounds.',1)}if(best.kind=='brick'){P.bricks++;say('Brick.',1)}if(best.kind=='blade'){P.shivs++;say('Shiv.',1)}
 }
 function collide(o,r){for(const s of solids){if(o.x>s.x0-r&&o.x<s.x1+r&&o.z>s.z0-r&&o.z<s.z1+r){
   const dx1=o.x-(s.x0-r),dx2=(s.x1+r)-o.x,dz1=o.z-(s.z0-r),dz2=(s.z1+r)-o.z,m=Math.min(dx1,dx2,dz1,dz2);
@@ -265,7 +317,7 @@ function update(dt){
   shotCd-=dt;muzzle.intensity*=.7;gun.rotation.x*=.85;heard0.r*=Math.pow(.2,dt);
   if(P.alive&&!P.won){
     P.sprint=keys.ShiftLeft&&!P.crouch;
-    const sp=P.crouch?2.2:P.sprint?7.5:4.2;let f=(keys.KeyW?1:0)-(keys.KeyS?1:0),s=(keys.KeyD?1:0)-(keys.KeyA?1:0);
+    P.listen=!!keys.Tab;const sp=(P.crouch?2.2:P.sprint?7.5:4.2)*(P.listen?.35:1);let f=(keys.KeyW?1:0)-(keys.KeyS?1:0),s=(keys.KeyD?1:0)-(keys.KeyA?1:0);
     const moving=f||s;if(moving){const l=Math.hypot(f,s);f/=l;s/=l;
       P.x+=(-Math.sin(P.yaw)*f+Math.cos(P.yaw)*s)*sp*dt;P.z+=(-Math.cos(P.yaw)*f-Math.sin(P.yaw)*s)*sp*dt;P.bob+=dt*sp*1.6;
       if(P.sprint)makeNoise(Math.max(heard0.r,22));else if(!P.crouch)makeNoise(Math.max(heard0.r,7))}
@@ -287,14 +339,16 @@ function update(dt){
     if(P.alive&&(sees||heard||(e.type=='clicker'&&d<2.2&&!P.crouch))){if(e.state!='chase')snd('screech');e.state='chase';e.alert=e.type=='clicker'?5:7}
     if(e.state=='chase'){e.alert-=dt;if(sees||heard){e.tx=P.x;e.tz=P.z}if(e.alert<=0)e.state='wander'}
     else if(Math.hypot(e.tx-p.x,e.tz-p.z)<1||R()<.002){e.tx=p.x+(R()-.5)*20;e.tz=p.z+(R()-.5)*20}
-    const spd=e.state=='chase'?(e.type=='runner'?5.4:4.4):1;
+    if(e.stun>0){e.stun-=dt;e.head.rotation.z=Math.sin(e.t*20)*.4;continue}
+    let spd=e.state=='chase'?({runner:5.4,clicker:4.4,bloater:2.2})[e.type]:1;
+    if(e.type=='bloater'&&e.state=='chase'&&d<16&&d>3){e.throwT-=dt;if(e.throwT<=0){e.throwT=3.5;lob(new THREE.Vector3(p.x,2.4,p.z),new THREE.Vector3(P.x,0,P.z),11,'spore')}}
     const tx=e.tx-p.x,tz=e.tz-p.z,tl=Math.hypot(tx,tz);
     if(tl>.8){const o={x:p.x+tx/tl*spd*dt,z:p.z+tz/tl*spd*dt};collide(o,.4);p.x=o.x;p.z=o.z;e.g.rotation.y=Math.atan2(-tx,-tz)}
     const sw=Math.sin(e.t*spd*2.2);e.legs[0].rotation.x=sw*.6;e.legs[1].rotation.x=-sw*.6;e.arms.forEach((a,i)=>a.rotation.x=-.6-(e.state=='chase'?.8:0)+Math.sin(e.t*9+i)*.15);
     e.head.rotation.z=Math.sin(e.t*(e.type=='clicker'?11:2))*.25;
-    if(e.type=='clicker'&&d<14&&clickT<=0){snd('click');clickT=.15+R()*.3}
-    if(e.state=='chase')danger=Math.max(danger,1-d/30);
-    e.atk-=dt;if(d<1.3&&P.alive&&!P.won&&e.atk<=0){e.atk=1;const dmg=e.type=='clicker'?45:18;P.hp-=dmg;P.hurtT=.6;snd('hurt');if(P.hp<=0){P.alive=false;end(false)}}
+    if(e.type!='runner'&&d<14&&clickT<=0){snd('click');clickT=.15+R()*.3}
+    if(e.state=='chase')danger=Math.max(danger,1-d/30);e.sil.visible=P.listen&&d<40;
+    e.atk-=dt;if(d<1.3&&P.alive&&!P.won&&e.atk<=0){e.atk=1;const dmg=({runner:18,clicker:45,bloater:60})[e.type];P.hp-=dmg;P.hurtT=.6;snd('hurt');if(P.hp<=0){P.alive=false;end(false)}}
   }
   P.hurtT-=dt;$('hurt').style.opacity=Math.max(0,P.hurtT)+(P.hp<35?.35:0);
 
@@ -304,10 +358,42 @@ function update(dt){
   loot.forEach(l=>{l.m.rotation.y+=dt;l.m.position.y=.5+Math.sin(clock.elapsedTime*2+l.m.position.x)*.08});
   beaconL.intensity=P.parts>=5?2+Math.sin(clock.elapsedTime*4)*1.5:0;beacon.material.color.setHex(P.parts>=5?0xb8ff70:0x3a4030);
 
+  // projectiles
+  for(let i=projs.length-1;i>=0;i--){const q=projs[i];q.v.y-=9.8*dt;q.m.position.addScaledVector(q.v,dt);q.m.rotation.x+=dt*8;
+    let hitE=null;if(q.kind=='brick')for(const e of enemies){if(!e.dead&&e.g.position.distanceTo(q.m.position)<1.1+(e.type=='bloater'?.5:0)){hitE=e;break}}
+    if(q.m.position.y<=.1||hitE){scene.remove(q.m);projs.splice(i,1);const x=q.m.position.x,z=q.m.position.z;
+      if(q.kind=='brick'){snd('clang');makeNoise(18,x,z);if(hitE){hitE.stun=hitE.type=='bloater'?1:3;say('Stunned. Press V.',1.2)}}
+      else{sporeCloud(x,z);snd('pop');if(Math.hypot(P.x-x,P.z-z)<2.6){P.hp-=22;P.hurtT=.8;snd('hurt');if(P.hp<=0&&P.alive){P.alive=false;end(false)}}}}}
+  for(let i=burst.length-1;i>=0;i--){const b=burst[i];b.t-=dt;b.m.scale.setScalar(1+(1.4-b.t)*1.5);b.m.material.opacity=b.t/2.8;if(b.t<=0){scene.remove(b.m);burst.splice(i,1)}}
+  // Ellie
+  {const E=ellie,g=E.g.position;E.t+=dt;const bx=P.x+Math.sin(P.yaw)*2.2+Math.cos(P.yaw)*1.2,bz=P.z+Math.cos(P.yaw)*2.2-Math.sin(P.yaw)*1.2;
+    const dx=bx-g.x,dz=bz-g.z,dd=Math.hypot(dx,dz);let es=0;
+    if(dd>.5){es=Math.min(dd*1.8,P.sprint?8:5);if(dd>25){g.x=bx;g.z=bz}else{const o={x:g.x+dx/dd*es*dt,z:g.z+dz/dd*es*dt};collide(o,.35);g.x=o.x;g.z=o.z}E.g.rotation.y=Math.atan2(-dx,-dz)}
+    E.g.scale.y=P.crouch?.72:1;const sw=Math.sin(E.t*es*2.4)*(es>.2?.6:0);E.legs[0].rotation.x=sw;E.legs[1].rotation.x=-sw;E.arms[0].rotation.x=-sw*.7;E.arms[1].rotation.x=sw*.7;
+    E.cd-=dt;if(E.cd<=0&&P.alive){let tgt=null;for(const e of enemies)if(!e.dead&&e.state=='chase'&&e.stun<=0&&e.g.position.distanceTo(new THREE.Vector3(P.x,0,P.z))<4){tgt=e;break}
+      if(tgt){E.cd=14;lob(new THREE.Vector3(g.x,1.4,g.z),tgt.g.position.clone().setY(1),16,'brick');ellieSay(['Get off him!','Heads up, ugly!','Brick! Go!'][(R()*3)|0],2)}}
+    E.talkT-=dt;if(E.talkT<=0){E.talkT=35+R()*30;if(danger<=0)ellieSay(ellieLines[(R()*ellieLines.length)|0])}}
+  if(ellieT>0){ellieT-=dt;if(ellieT<=0)$('ellie').style.opacity=0}
+  // weather: rain fronts and lightning
+  weatherT-=dt;if(weatherT<=0){weatherT=45+R()*40;weather=weather?0:1;if(weather)ellieSay('Rain. Great. Wet mushrooms.',2.5)}
+  rain.material.opacity+=((weather?.45:0)-rain.material.opacity)*dt*.5;rain.position.set(P.x,0,P.z);
+  if(rain.material.opacity>.02){const ra=rainG.attributes.position.array;for(let i=0;i<rainN;i++){let y=ra[i*6+1]-dt*28;if(y<0)y+=30;ra[i*6+1]=y;ra[i*6+4]=y-.7}rainG.attributes.position.needsUpdate=true;
+    boltT-=dt;if(boltT<=0){boltT=6+R()*14;$('bolt').style.transition='none';$('bolt').style.opacity=.55;setTimeout(()=>{$('bolt').style.transition='opacity 1.2s';$('bolt').style.opacity=0},90);setTimeout(()=>snd('thunder'),600+R()*1200)}}
+  scene.fog.density+=((weather?.034:.022)-scene.fog.density)*dt*.3;
+  const lv=P.listen?1:0;$('listen').style.opacity=lv;renderer.domElement.style.filter=lv?'grayscale(.85) contrast(1.1)':'';
+  // compass
+  {let h='';const add=(x,z,cls,lbl)=>{let a=Math.atan2(-(x-P.x),-(z-P.z))-P.yaw;a=Math.atan2(Math.sin(a),Math.cos(a));if(Math.abs(a)<1.6)h+=`<b class="${cls}" style="left:${50-a/1.6*50}%">${lbl}</b>`};
+    [['N',0,-1],['E',1,0],['S',0,1],['W',-1,0]].forEach(([l,x,z])=>add(P.x+x*1e3,P.z+z*1e3,'',l));
+    if(P.parts>=5)add(tower.position.x,tower.position.z,'tw','▲ TOWER');else{let n=null,nd=1e9;for(const l of loot)if(l.kind=='part'){const d=Math.hypot(l.m.position.x-P.x,l.m.position.z-P.z);if(d<nd){nd=d;n=l}}if(n)add(n.m.position.x,n.m.position.z,'pt','◆ '+Math.round(nd)+'m')}
+    $('compass').innerHTML=h}
+  // context prompt
+  {let t='';for(const l of loot)if(Math.hypot(l.m.position.x-P.x,l.m.position.z-P.z)<2.6){t='E · pick up '+({part:'radio part',rags:'rags',alcohol:'alcohol',ammo:'ammo',brick:'brick',blade:'blade'})[l.kind];break}
+    if(!t)for(const e of enemies)if(!e.dead&&e.type!='bloater'&&Math.hypot(e.g.position.x-P.x,e.g.position.z-P.z)<1.9&&(e.state!='chase'||e.stun>0)){t='V · '+(e.type=='clicker'?'shiv':'strangle');break}
+    $('prompt').textContent=t}
   // HUD
   $('hp').style.width=Math.max(0,P.hp)+'%';$('hp').style.background=P.hp<35?'var(--blood)':'var(--moss)';
   $('parts').textContent=P.parts+' / 5';$('ammo').textContent=P.mag+' · '+P.ammo;
-  $('inv').textContent=`Rags ${P.rags} · Alcohol ${P.alc} · Medkits ${P.med}`;
+  $('inv2').textContent=`Bricks ${P.bricks} · Shivs ${P.shivs}`;$('inv').textContent=`Rags ${P.rags} · Alcohol ${P.alc} · Medkits ${P.med}`;
   $('obj').textContent=P.parts<5?'Find radio parts in the ruins.':'Reach the signal tower, due north.';
   $('stealth').textContent=(P.crouch?'Crouched · quiet':P.sprint?'Sprinting · loud':'')+(danger>0?'  ·  Hunted':'');
 }
@@ -319,7 +405,7 @@ function frame(){const dt=Math.min(clock.getDelta(),.05);if(started)update(dt);e
   renderer.render(scene,cam);requestAnimationFrame(frame)}
 frame();
 $('go').onclick=()=>{$('menu').hidden=true;started=true;try{AC=new (window.AudioContext||window.webkitAudioContext)();ambience()}catch(_){}
-  try{const p=renderer.domElement.requestPointerLock();p&&p.catch&&p.catch(()=>{})}catch(_){}say('Find the five radio parts. Stay quiet.',3.5)};
+  try{const p=renderer.domElement.requestPointerLock();p&&p.catch&&p.catch(()=>{})}catch(_){}say('Find the five radio parts. Stay quiet.',3.5);setTimeout(()=>ellieSay('Stick close. I got bricks if you need them.'),4000)};
 addEventListener('resize',()=>{cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});
 })();
 </script>
