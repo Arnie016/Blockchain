@@ -11,7 +11,10 @@
   const PROPS = ['sedan', 'barrel', 'crate', 'dumpster', 'fungus_cluster', 'fungus_column', 'fungal_cocoon', 'generator', 'boiler', 'sofa', 'wardrobe', 'kitchen_table', 'pharmacy_shelf', 'pharmacy_counter', 'plank'];
   const TEX = ['asphalt_wet', 'brick_wet', 'fungal_wall', 'fungal_mat_floor', 'concrete_interior', 'steel_door'];
 
+  // the artifact host serves binaries only under web types, so deployed copies carry a .wasm suffix
+  const SUFFIX = /^(localhost|127\.)/.test(location.hostname) ? '' : '.wasm';
   function loadGLB(loader, url) {
+    url += SUFFIX;
     return new Promise((res) => loader.load(url, res, undefined, () => res(null)));
   }
   HF.load = async function (renderer, onProgress) {
