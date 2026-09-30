@@ -38,6 +38,7 @@ canvas{display:block}
 #menu p{margin:0;color:var(--dim);line-height:1.6}
 #menu kbd{font-family:var(--mono);border:1px solid #ffffff30;padding:1px 5px;color:var(--ink)}
 #go{justify-self:start;font-family:var(--display);font-size:20px;background:var(--rust);color:#1a0d06;border:0;padding:12px 26px;cursor:pointer}
+#go:disabled{opacity:.6;cursor:wait}
 #go:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
 </style>
 
@@ -65,10 +66,19 @@ canvas{display:block}
 </div></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/utils/SkeletonUtils.js"></script>
+<script>
+// minimal namespace used by the audio engine
+window.OG={settings:{master:.9,music:.75,sfx:1},clamp:(v,a,b)=>v<a?a:v>b?b:v,damp:(a,b,l,dt)=>a+(b-a)*(1-Math.exp(-l*dt)),
+  pick:(a,r=Math.random)=>a[(r()*a.length)|0],frame:()=>new Promise(r=>setTimeout(r,0))};
+</script>
+<script src="js/audio.js"></script>
+<script src="js/hf.js"></script>
 <script>
 (()=>{
 const $=id=>document.getElementById(id);
-let R=Math.random;
+let R=Math.random;const carGroups=[],roadMats=[];
 // seeded rng so the city layout is stable
 let seed=1337;const rnd=()=>{seed=(seed*16807)%2147483647;return (seed-1)/2147483646};
 
@@ -114,7 +124,7 @@ sun.shadow.mapSize.set(2048,2048);Object.assign(sun.shadow.camera,{left:-60,righ
 const M=(t,o={})=>new THREE.MeshStandardMaterial(Object.assign({map:t,roughness:.95,metalness:0},o));
 const ground=new THREE.Mesh(new THREE.PlaneGeometry(240,240),M(T.grass));ground.rotation.x=-Math.PI/2;ground.receiveShadow=true;scene.add(ground);
 // roads
-[[0,0,12,220],[0,0,220,12],[45,0,10,220],[-45,0,10,220]].forEach(([x,z,w,d])=>{const r=new THREE.Mesh(new THREE.PlaneGeometry(w,d),M(T.asphalt));r.rotation.x=-Math.PI/2;r.position.set(x,.02,z);r.receiveShadow=true;scene.add(r)});
+[[0,0,12,220],[0,0,220,12],[45,0,10,220],[-45,0,10,220]].forEach(([x,z,w,d])=>{const r=new THREE.Mesh(new THREE.PlaneGeometry(w,d),M(T.asphalt));r.rotation.x=-Math.PI/2;r.position.set(x,.02,z);r.receiveShadow=true;scene.add(r);roadMats.push({m:r.material,w,d})});
 
 const solids=[];// AABBs {x0,x1,z0,z1}
 function block(x,z,w,d,h){
@@ -145,7 +155,7 @@ for(let i=0;i<26;i++){
   const top=new THREE.Mesh(new THREE.BoxGeometry(2.2,.8,1.7),carMat);top.position.set(-.2,1.6,0);
   const glass=new THREE.Mesh(new THREE.BoxGeometry(2.25,.5,1.75),new THREE.MeshStandardMaterial({color:0x1a2020,roughness:.2,metalness:.5}));glass.position.set(-.2,1.6,0);
   g.add(b,top,glass);g.traverse(o=>{o.castShadow=o.receiveShadow=true});
-  g.position.set(x,0,z);g.rotation.y=(onX?0:Math.PI/2)+(rnd()-.5)*.8;g.rotation.z=(rnd()-.5)*.15;scene.add(g);
+  g.position.set(x,0,z);g.rotation.y=(onX?0:Math.PI/2)+(rnd()-.5)*.8;g.rotation.z=(rnd()-.5)*.15;scene.add(g);carGroups.push(g);
   const c=Math.cos(g.rotation.y),s=Math.abs(Math.sin(g.rotation.y));const hw=2.1*Math.abs(c)+ .95*s,hd=2.1*s+.95*Math.abs(c);
   solids.push({x0:x-hw,x1:x+hw,z0:z-hd,z1:z+hd});
 }
@@ -245,7 +255,17 @@ const rain=new THREE.LineSegments(rainG,new THREE.LineBasicMaterial({color:0xa8b
 let weather=0,weatherT=40,boltT=8;
 
 /* ---------- audio (synth) ---------- */
-let AC;function snd(type){if(!AC)return;const t=AC.currentTime,o=AC.createOscillator(),g=AC.createGain();o.connect(g);g.connect(AC.destination);
+let AC;
+const SND={shot:'revolver',click:'dryfire',pick:'pick',hurt:'hurt',clang:'brick',pop:'shatter'};
+function snd(type,pos){
+  const A=OG.audio;
+  if(A&&A.ready){
+    if(type=='thunder'){A.thunder(0,.9);return}
+    if(type=='screech'){if(pos)A.play(pos.kind=='clicker'?'clicker_scream':pos.kind=='bloater'?'bloater_roar':'runner_scream',{pos,vol:1});return}
+    if(type=='clickerv'){A.play(pos.kind=='bloater'?'bloater':'clicker',{pos,vol:.9,ref:3});return}
+    if(type=='pop'){A.play('shatter',{pos,vol:.8});A.play('ignite',{pos,vol:.5});return}
+    A.play(SND[type]||type,pos?{pos}:{});return}
+  if(!AC||type=='clickerv')return;const t=AC.currentTime,o=AC.createOscillator(),g=AC.createGain();o.connect(g);g.connect(AC.destination);
   if(type=='shot'){const b=AC.createBuffer(1,AC.sampleRate*.3,AC.sampleRate),d=b.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=(R()*2-1)*Math.pow(1-i/d.length,3);const s=AC.createBufferSource();s.buffer=b;const f=AC.createBiquadFilter();f.frequency.value=1800;s.connect(f);f.connect(g);g.gain.value=.6;s.start();return}
   if(type=='click'){o.type='square';o.frequency.setValueAtTime(900+R()*600,t);g.gain.setValueAtTime(.05,t);g.gain.exponentialRampToValueAtTime(.001,t+.04);o.start(t);o.stop(t+.05);return}
   if(type=='screech'){o.type='sawtooth';o.frequency.setValueAtTime(500,t);o.frequency.linearRampToValueAtTime(220,t+.5);g.gain.setValueAtTime(.08,t);g.gain.linearRampToValueAtTime(0,t+.5);o.start(t);o.stop(t+.5);return}
@@ -288,7 +308,7 @@ function shoot(){if(!P.alive||P.won||shotCd>0)return;
   P.mag--;shotCd=.45;snd('shot');muzzle.intensity=6;gun.rotation.x=.35;makeNoise(40);
   ray.setFromCamera({x:0,y:0},cam);const hits=ray.intersectObjects(enemies.filter(e=>!e.dead).map(e=>e.g),true);
   if(hits.length&&hits[0].distance<60){const e=hits[0].object.userData.e;const head=hits[0].object===e.head;e.hp-=head?3:1;e.state='chase';e.alert=10;e.tx=P.x;e.tz=P.z;
-    if(e.hp<=0){e.dead=true;e.g.rotation.x=-Math.PI/2;e.g.position.y=.3;e.sil.visible=false;say(head?'Headshot.':'Down.',1)}}
+    if(e.hp<=0){e.dead=true;killVisual(e);e.sil.visible=false;say(head?'Headshot.':'Down.',1)}}
 }
 function throwBrick(){if(P.bricks<=0){say('No bricks. Find some in the rubble.',1.5);return}P.bricks--;
   const fwd=new THREE.Vector3(0,0,-1).applyQuaternion(cam.quaternion);const to=cam.position.clone().addScaledVector(fwd,Math.max(6,Math.min(22,14+fwd.y*20)));to.y=0;
@@ -298,11 +318,11 @@ function takedown(){let best=null,bd=1.9;for(const e of enemies){if(e.dead)conti
   if(best.type=='bloater'){say('Too big to take down quietly.',1.5);return}
   if(best.state=='chase'&&best.stun<=0){say('It sees you coming. Stun it first.',1.5);return}
   if(best.type=='clicker'){if(P.shivs<=0){say('Clickers need a shiv.',1.5);return}P.shivs--}
-  best.dead=true;best.g.rotation.x=-Math.PI/2;best.g.position.y=.3;best.sil.visible=false;snd('pick');say(best.type=='clicker'?'Shivved.':'Strangled. Quietly.',1.2);makeNoise(3)}
+  best.dead=true;killVisual(best);best.sil.visible=false;snd('pick');say(best.type=='clicker'?'Shivved.':'Strangled. Quietly.',1.2);makeNoise(3)}
 function reload(){const n=Math.min(6-P.mag,P.ammo);if(n>0){P.mag+=n;P.ammo-=n;say('Reloaded.',1)}}
 function pickup(){let best=null,bd=2.6;for(const l of loot){const d=Math.hypot(l.m.position.x-P.x,l.m.position.z-P.z);if(d<bd){bd=d;best=l}}
   if(!best){return}scene.remove(best.m);loot.splice(loot.indexOf(best),1);snd('pick');
-  if(best.kind=='part'){P.parts++;say(P.parts<5?`Radio part ${P.parts} of 5.`:'All parts found. Get to the signal tower (north).',3.5)}
+  if(best.kind=='part'){P.parts++;OG.audio.ready&&OG.audio.stinger('stinger_part',.6);say(P.parts<5?`Radio part ${P.parts} of 5.`:'All parts found. Get to the signal tower (north).',3.5)}
   if(best.kind=='rags'){P.rags++;say('Rags.',1)}if(best.kind=='alcohol'){P.alc++;say('Alcohol.',1)}if(best.kind=='ammo'){P.ammo+=4;say('+4 rounds.',1)}if(best.kind=='brick'){P.bricks++;say('Brick.',1)}if(best.kind=='blade'){P.shivs++;say('Shiv.',1)}
 }
 function collide(o,r){for(const s of solids){if(o.x>s.x0-r&&o.x<s.x1+r&&o.z>s.z0-r&&o.z<s.z1+r){
@@ -311,15 +331,34 @@ function collide(o,r){for(const s of solids){if(o.x>s.x0-r&&o.x<s.x1+r&&o.z>s.z0
   o.x=Math.max(-110,Math.min(110,o.x));o.z=Math.max(-110,Math.min(110,o.z))}
 
 /* ---------- loop ---------- */
-const clock=new THREE.Clock();let clickT=0;
+const clock=new THREE.Clock();let clickT=0,stingT=0,stepPh=0;
+if(/debug/.test(location.hash))window.__og={P:()=>P,enemies};
+function killVisual(e){if(e.hf){e.hf.play('death',.12)}else{e.g.rotation.x=-Math.PI/2;e.g.position.y=.3}
+  if(OG.audio.ready)OG.audio.play('body_fall',{pos:{x:e.g.position.x,y:.5,z:e.g.position.z},delay:.5})}
+function animInfected(e,dt,d){if(!e.hf)return;const p=e.g.position,lx=e.lx??p.x,lz=e.lz??p.z;const v=Math.hypot(p.x-lx,p.z-lz)/Math.max(dt,1e-3);e.lx=p.x;e.lz=p.z;
+  if(e.hf.busy()&&e.hf.state!=='scream')return;
+  if(e.screamT>0){e.screamT-=dt;e.hf.play('scream',.15);return}
+  if(e.stun>0)e.hf.play('stagger',.2);else if(v>2.5)e.hf.play('run',.25,Math.min(1.4,v/4.5));else if(v>.2)e.hf.play('walk',.3,Math.max(.6,v*1.1));else e.hf.play('idle',.4)}
+// swap placeholder bodies, cars and roads for the Higgsfield assets once they load
+function applyAssets(){
+  enemies.forEach(e=>{e.g.userData.e=e;e.sil.userData.keep=true;e.hf=HF.attach(e.g,e.type,e.type=='bloater'?{scale:1.3,tint:0xd8b080}:{});if(e.dead&&e.hf)e.hf.play('death',0)});
+  ellie.hf=HF.attach(ellie.g,'ellie');
+  carGroups.forEach(g=>{const car=HF.prop('sedan',4.4);if(!car)return;g.traverse(o=>{if(o.isMesh)o.visible=false});const h=car.userData.half;if(h.z>h.x)car.rotation.y=Math.PI/2;g.add(car)});
+  if(HF.tex.asphalt_wet)roadMats.forEach(({m,w,d})=>{const t=HF.tex.asphalt_wet.clone();t.needsUpdate=true;t.repeat.set(w/5,d/5);m.map=t;m.color.set(0xd0d0d0);m.roughness=.55;m.needsUpdate=true});
+  // dress the ruins with the prop set
+  const kit=[['barrel',.9],['crate',1],['dumpster',2],['fungus_cluster',1.6],['fungus_column',1.4],['fungal_cocoon',1],['generator',1.2],['sofa',2],['wardrobe',1.2],['kitchen_table',1.6],['plank',3]];
+  for(let i=0;i<70;i++){const [n,len]=kit[i%kit.length];const o=HF.prop(n,len*(.85+R()*.3));if(!o)continue;const [x,z]=freeSpot(12);const h=o.userData.half;
+    o.position.set(x,0,z);o.rotation.y=R()*6.28;scene.add(o);if(n!='plank'){const r=Math.max(h.x,h.z);solids.push({x0:x-r,x1:x+r,z0:z-r,z1:z+r})}}
+}
 function update(dt){
+  HF.update(dt);stingT-=dt;
   if(msgT>0){msgT-=dt;if(msgT<=0)$('msg').style.opacity=0}
   shotCd-=dt;muzzle.intensity*=.7;gun.rotation.x*=.85;heard0.r*=Math.pow(.2,dt);
   if(P.alive&&!P.won){
     P.sprint=keys.ShiftLeft&&!P.crouch;
     P.listen=!!keys.Tab;const sp=(P.crouch?2.2:P.sprint?7.5:4.2)*(P.listen?.35:1);let f=(keys.KeyW?1:0)-(keys.KeyS?1:0),s=(keys.KeyD?1:0)-(keys.KeyA?1:0);
     const moving=f||s;if(moving){const l=Math.hypot(f,s);f/=l;s/=l;
-      P.x+=(-Math.sin(P.yaw)*f+Math.cos(P.yaw)*s)*sp*dt;P.z+=(-Math.cos(P.yaw)*f-Math.sin(P.yaw)*s)*sp*dt;P.bob+=dt*sp*1.6;
+      P.x+=(-Math.sin(P.yaw)*f+Math.cos(P.yaw)*s)*sp*dt;P.z+=(-Math.cos(P.yaw)*f-Math.sin(P.yaw)*s)*sp*dt;P.bob+=dt*sp*1.6;stepPh+=dt*sp*.55;if(stepPh>1&&OG.audio.ready){stepPh=0;OG.audio.play(P.sprint?'step_asphalt':'step_concrete',{vol:P.crouch?.12:P.sprint?.5:.3})}
       if(P.sprint)makeNoise(Math.max(heard0.r,22));else if(!P.crouch)makeNoise(Math.max(heard0.r,7))}
     collide(P,.45);
     if(P.parts>=5&&Math.hypot(P.x-tower.position.x,P.z-tower.position.z)<5){P.won=true;end(true)}
@@ -332,11 +371,11 @@ function update(dt){
 
   // enemies
   let danger=0;clickT-=dt;
-  for(const e of enemies){if(e.dead)continue;e.t+=dt;const p=e.g.position,dx=P.x-p.x,dz=P.z-p.z,d=Math.hypot(dx,dz);
+  for(const e of enemies){const p=e.g.position,dx=P.x-p.x,dz=P.z-p.z,d=Math.hypot(dx,dz);e.g.visible=d<(e.dead?40:75);if(e.dead)continue;e.t+=dt;
     let sees=false;
     if(e.type=='runner'){const range=(P.crouch?6:16)+(flashOn?10:0);sees=d<range}
     const heard=Math.hypot(heard0.x-p.x,heard0.z-p.z)<heard0.r;
-    if(P.alive&&(sees||heard||(e.type=='clicker'&&d<2.2&&!P.crouch))){if(e.state!='chase')snd('screech');e.state='chase';e.alert=e.type=='clicker'?5:7}
+    if(P.alive&&(sees||heard||(e.type=='clicker'&&d<2.2&&!P.crouch))){if(e.state!='chase'){snd('screech',{x:p.x,y:1.6,z:p.z,kind:e.type});e.screamT=1.2;if(d<30&&stingT<=0&&OG.audio.ready){OG.audio.stinger('stinger_spotted',.7);stingT=20}}e.state='chase';e.alert=e.type=='clicker'?5:7}
     if(e.state=='chase'){e.alert-=dt;if(sees||heard){e.tx=P.x;e.tz=P.z}if(e.alert<=0)e.state='wander'}
     else if(Math.hypot(e.tx-p.x,e.tz-p.z)<1||R()<.002){e.tx=p.x+(R()-.5)*20;e.tz=p.z+(R()-.5)*20}
     if(e.stun>0){e.stun-=dt;e.head.rotation.z=Math.sin(e.t*20)*.4;continue}
@@ -346,9 +385,11 @@ function update(dt){
     if(tl>.8){const o={x:p.x+tx/tl*spd*dt,z:p.z+tz/tl*spd*dt};collide(o,.4);p.x=o.x;p.z=o.z;e.g.rotation.y=Math.atan2(-tx,-tz)}
     const sw=Math.sin(e.t*spd*2.2);e.legs[0].rotation.x=sw*.6;e.legs[1].rotation.x=-sw*.6;e.arms.forEach((a,i)=>a.rotation.x=-.6-(e.state=='chase'?.8:0)+Math.sin(e.t*9+i)*.15);
     e.head.rotation.z=Math.sin(e.t*(e.type=='clicker'?11:2))*.25;
-    if(e.type!='runner'&&d<14&&clickT<=0){snd('click');clickT=.15+R()*.3}
+    if(e.type!='runner'&&d<30&&clickT<=0){snd('clickerv',{x:p.x,y:1.6,z:p.z,kind:e.type});clickT=.6+R()*1.2}
+    if(e.type=='runner'&&d<30){e.moanT=(e.moanT||R()*6)-dt;if(e.moanT<=0&&OG.audio.ready){e.moanT=4+R()*6;OG.audio.play(e.state=='chase'?'runner_attack':'runner_moan',{pos:{x:p.x,y:1.6,z:p.z},vol:.7})}}
+    animInfected(e,dt,d);
     if(e.state=='chase')danger=Math.max(danger,1-d/30);e.sil.visible=P.listen&&d<40;
-    e.atk-=dt;if(d<1.3&&P.alive&&!P.won&&e.atk<=0){e.atk=1;const dmg=({runner:18,clicker:45,bloater:60})[e.type];P.hp-=dmg;P.hurtT=.6;snd('hurt');if(P.hp<=0){P.alive=false;end(false)}}
+    e.atk-=dt;if(d<1.3&&P.alive&&!P.won&&e.atk<=0){e.atk=1;const dmg=({runner:18,clicker:45,bloater:60})[e.type];P.hp-=dmg;P.hurtT=.6;snd('hurt');if(e.hf)e.hf.play('attack',.1);if(P.hp<=0){P.alive=false;end(false)}}
   }
   P.hurtT-=dt;$('hurt').style.opacity=Math.max(0,P.hurtT)+(P.hp<35?.35:0);
 
@@ -362,18 +403,22 @@ function update(dt){
   for(let i=projs.length-1;i>=0;i--){const q=projs[i];q.v.y-=9.8*dt;q.m.position.addScaledVector(q.v,dt);q.m.rotation.x+=dt*8;
     let hitE=null;if(q.kind=='brick')for(const e of enemies){if(!e.dead&&e.g.position.distanceTo(q.m.position)<1.1+(e.type=='bloater'?.5:0)){hitE=e;break}}
     if(q.m.position.y<=.1||hitE){scene.remove(q.m);projs.splice(i,1);const x=q.m.position.x,z=q.m.position.z;
-      if(q.kind=='brick'){snd('clang');makeNoise(18,x,z);if(hitE){hitE.stun=hitE.type=='bloater'?1:3;say('Stunned. Press V.',1.2)}}
-      else{sporeCloud(x,z);snd('pop');if(Math.hypot(P.x-x,P.z-z)<2.6){P.hp-=22;P.hurtT=.8;snd('hurt');if(P.hp<=0&&P.alive){P.alive=false;end(false)}}}}}
+      if(q.kind=='brick'){snd('clang',{x,y:.3,z});makeNoise(18,x,z);if(hitE){hitE.stun=hitE.type=='bloater'?1:3;say('Stunned. Press V.',1.2)}}
+      else{sporeCloud(x,z);snd('pop',{x,y:.5,z});if(Math.hypot(P.x-x,P.z-z)<2.6){P.hp-=22;P.hurtT=.8;snd('hurt');if(P.hp<=0&&P.alive){P.alive=false;end(false)}}}}}
   for(let i=burst.length-1;i>=0;i--){const b=burst[i];b.t-=dt;b.m.scale.setScalar(1+(1.4-b.t)*1.5);b.m.material.opacity=b.t/2.8;if(b.t<=0){scene.remove(b.m);burst.splice(i,1)}}
   // Ellie
   {const E=ellie,g=E.g.position;E.t+=dt;const bx=P.x+Math.sin(P.yaw)*2.2+Math.cos(P.yaw)*1.2,bz=P.z+Math.cos(P.yaw)*2.2-Math.sin(P.yaw)*1.2;
     const dx=bx-g.x,dz=bz-g.z,dd=Math.hypot(dx,dz);let es=0;
     if(dd>.5){es=Math.min(dd*1.8,P.sprint?8:5);if(dd>25){g.x=bx;g.z=bz}else{const o={x:g.x+dx/dd*es*dt,z:g.z+dz/dd*es*dt};collide(o,.35);g.x=o.x;g.z=o.z}E.g.rotation.y=Math.atan2(-dx,-dz)}
-    E.g.scale.y=P.crouch?.72:1;const sw=Math.sin(E.t*es*2.4)*(es>.2?.6:0);E.legs[0].rotation.x=sw;E.legs[1].rotation.x=-sw;E.arms[0].rotation.x=-sw*.7;E.arms[1].rotation.x=sw*.7;
+    if(E.hf){E.hf.play(es>4.5?'run':es>.3?(P.crouch?'crouch':'walk'):'idle',.3)}else E.g.scale.y=P.crouch?.72:1;const sw=Math.sin(E.t*es*2.4)*(es>.2?.6:0);E.legs[0].rotation.x=sw;E.legs[1].rotation.x=-sw;E.arms[0].rotation.x=-sw*.7;E.arms[1].rotation.x=sw*.7;
     E.cd-=dt;if(E.cd<=0&&P.alive){let tgt=null;for(const e of enemies)if(!e.dead&&e.state=='chase'&&e.stun<=0&&e.g.position.distanceTo(new THREE.Vector3(P.x,0,P.z))<4){tgt=e;break}
       if(tgt){E.cd=14;lob(new THREE.Vector3(g.x,1.4,g.z),tgt.g.position.clone().setY(1),16,'brick');ellieSay(['Get off him!','Heads up, ugly!','Brick! Go!'][(R()*3)|0],2)}}
     E.talkT-=dt;if(E.talkT<=0){E.talkT=35+R()*30;if(danger<=0)ellieSay(ellieLines[(R()*ellieLines.length)|0])}}
   if(ellieT>0){ellieT-=dt;if(ellieT<=0)$('ellie').style.opacity=0}
+  // horror mix: listener, ambience and score follow the fight
+  if(OG.audio.ready){const fw=new THREE.Vector3(0,0,-1).applyQuaternion(cam.quaternion);OG.audio.setListener({x:P.x,y:1.6,z:P.z},fw);
+    let near=99;for(const e of enemies)if(!e.dead)near=Math.min(near,e.g.position.distanceTo(new THREE.Vector3(P.x,0,P.z)));
+    OG.audio.update(dt,{interior:false,rain:Math.min(1,rain.material.opacity/.45),tension:Math.max(0,1-near/28),combat:danger,dark:.4,hp:Math.max(0,P.hp)/100,near:{trees:true},pos:{x:P.x,z:P.z}})}
   // weather: rain fronts and lightning
   weatherT-=dt;if(weatherT<=0){weatherT=45+R()*40;weather=weather?0:1;if(weather)ellieSay('Rain. Great. Wet mushrooms.',2.5)}
   rain.material.opacity+=((weather?.45:0)-rain.material.opacity)*dt*.5;rain.position.set(P.x,0,P.z);
@@ -397,14 +442,20 @@ function update(dt){
   $('obj').textContent=P.parts<5?'Find radio parts in the ruins.':'Reach the signal tower, due north.';
   $('stealth').textContent=(P.crouch?'Crouched · quiet':P.sprint?'Sprinting · loud':'')+(danger>0?'  ·  Hunted':'');
 }
-function end(win){document.exitPointerLock&&document.exitPointerLock();
+function end(win){if(!win&&OG.audio.ready)OG.audio.stinger('stinger_death',.9);document.exitPointerLock&&document.exitPointerLock();
   const m=$('menu');m.hidden=false;m.querySelector('h1').innerHTML=win?'Signal <span>sent</span>':'You were <span>turned</span>';
   m.querySelectorAll('p')[0].textContent=win?'The Fireflies heard you. A light answers from across the bay.':'The spores take everyone eventually. Not today, though. Try again.';
   m.querySelectorAll('p')[1].textContent='';$('go').textContent='Play again';$('go').onclick=()=>location.reload();started=false}
 function frame(){const dt=Math.min(clock.getDelta(),.05);if(started)update(dt);else{P.yaw+=dt*.05;cam.position.set(P.x,1.65,P.z);cam.rotation.set(P.pitch,P.yaw,0,'YXZ')}
   renderer.render(scene,cam);requestAnimationFrame(frame)}
 frame();
-$('go').onclick=()=>{$('menu').hidden=true;started=true;try{AC=new (window.AudioContext||window.webkitAudioContext)();ambience()}catch(_){}
+// load the Higgsfield assets and synthesise the horror sound set before the player enters
+const go=$('go');go.disabled=true;go.textContent='Loading 0%';
+let pA=0,pS=0;const prog=()=>{go.textContent='Loading '+Math.round((pA*.7+pS*.3)*100)+'%'};
+Promise.all([HF.load(renderer,v=>{pA=v;prog()}).catch(()=>{}),OG.audio.init(v=>{pS=v;prog()}).catch(()=>{})]).then(()=>{
+  if(HF.ready)applyAssets();go.disabled=false;go.textContent='Enter the city'});
+$('go').onclick=()=>{$('menu').hidden=true;started=true;
+  if(OG.audio.ready){OG.audio.resume();OG.audio.startWorld()}else{try{AC=new (window.AudioContext||window.webkitAudioContext)();ambience()}catch(_){}}
   try{const p=renderer.domElement.requestPointerLock();p&&p.catch&&p.catch(()=>{})}catch(_){}say('Find the five radio parts. Stay quiet.',3.5);setTimeout(()=>ellieSay('Stick close. I got bricks if you need them.'),4000)};
 addEventListener('resize',()=>{cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});
 })();
