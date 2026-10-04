@@ -1,3 +1,4 @@
+<meta charset="utf-8">
 <title>Overgrowth Survival Slice</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Special+Elite&family=IBM+Plex+Mono:wght@400;600&display=swap">
 <style>
@@ -31,6 +32,13 @@ canvas{display:block}
 #ellie{color:#d9a38a;font-family:var(--display);font-size:14px;position:absolute;left:50%;bottom:calc(64px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);opacity:0;transition:opacity .4s;text-shadow:0 2px 6px #000;width:min(90%,560px);text-align:center}
 #prompt{position:absolute;left:50%;top:58%;transform:translateX(-50%);font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink);text-shadow:0 1px 4px #000}
 #bolt{position:absolute;inset:0;background:#dfe8ff;opacity:0;pointer-events:none}
+/* block mode: a Minecraft hotbar dropped into the ruins */
+#hotbar{position:absolute;left:50%;bottom:calc(92px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);display:flex;gap:2px;padding:3px;background:#0008;border:2px solid #0009}
+#hotbar div{width:40px;height:40px;border:2px solid #8b8b8b55;image-rendering:pixelated;background-size:cover;position:relative}
+#hotbar div.on{border-color:#fff;box-shadow:0 0 0 2px #000}
+#hotbar div b{position:absolute;right:2px;bottom:0;font:600 10px var(--mono);color:#fff;text-shadow:1px 1px 0 #000}
+#bname{position:absolute;left:50%;bottom:calc(142px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);font:600 13px var(--mono);color:#fff;text-shadow:2px 2px 0 #3f3f3f}
+#shake{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none}
 #menu{position:fixed;inset:0;display:grid;place-items:center;background:radial-gradient(ellipse at 50% 40%,#1b2214cc,#050604f2);pointer-events:auto;padding:16px}
 #menu .card{max-width:520px;display:grid;gap:14px}
 #menu h1{font-family:var(--display);font-weight:400;font-size:clamp(34px,8vw,56px);margin:0;line-height:1;color:var(--ink);text-wrap:balance}
@@ -53,8 +61,8 @@ canvas{display:block}
     <div class="lbl">Revolver</div><div class="big" id="ammo">6 · 12</div>
     <div class="lbl" id="inv2"></div><div class="lbl" id="inv">Rags 0 · Alcohol 0 · Medkits 1</div>
   </div>
-  <div class="bl">WASD move · mouse look · click shoot · R reload · Shift sprint · C crouch · E loot · G throw brick · V stealth kill · hold Tab listen · Q medkit · H heal · F light</div>
-  <div id="compass"></div><div id="listen"></div><div id="bolt"></div><div id="ellie"></div><div id="prompt"></div><div id="cross"></div><div id="hurt"></div><div id="msg"></div>
+  <div class="bl">WASD move · mouse look · click shoot · R reload · Shift sprint · C crouch · E loot · G throw brick · V stealth kill · B block mode · Space jump · hold Tab listen · Q medkit · H heal · F light</div>
+  <div id="compass"></div><div id="listen"></div><div id="bolt"></div><div id="ellie"></div><div id="prompt"></div><div id="cross"></div><div id="hurt"></div><div id="msg"></div><div id="hotbar" hidden></div><div id="bname" hidden></div><div id="shake"></div>
 </div>
 
 <div id="menu"><div class="card">
@@ -197,7 +205,7 @@ function addLoot(kind){
 for(let i=0;i<5;i++)addLoot('part');for(let i=0;i<10;i++)addLoot('rags');for(let i=0;i<8;i++)addLoot('alcohol');for(let i=0;i<9;i++)addLoot('ammo');for(let i=0;i<12;i++)addLoot('brick');for(let i=0;i<6;i++)addLoot('blade');
 
 /* ---------- player ---------- */
-const P={x:0,z:10,yaw:Math.PI,pitch:-.1,hp:100,mag:6,ammo:12,rags:0,alc:0,med:1,parts:0,bricks:1,shivs:1,listen:false,crouch:false,sprint:false,bob:0,hurtT:0,alive:true,won:false};
+const P={x:0,z:10,y:0,vy:0,ground:true,yaw:Math.PI,pitch:-.1,hp:100,mag:6,ammo:12,rags:0,alc:0,med:1,parts:0,bricks:1,shivs:1,listen:false,crouch:false,sprint:false,bob:0,hurtT:0,alive:true,won:false};
 const flash=new THREE.SpotLight(0xfff0c8,0,40,.45,.5,1.4);flash.castShadow=true;scene.add(flash,flash.target);let flashOn=false;
 // held revolver in view
 const gun=new THREE.Group();
@@ -289,13 +297,18 @@ addEventListener('keydown',e=>{keys[e.code]=true;if(!started||!P.alive)return;
   if(e.code=='KeyR')reload();
   if(e.code=='KeyE')pickup();
   if(e.code=='KeyQ'){if(P.rags>=1&&P.alc>=1){P.rags--;P.alc--;P.med++;say('Crafted a medkit.');snd('pick')}else say('Need 1 rag and 1 alcohol to craft.')}
+  if(e.code=='KeyB')BM.toggle();
+  if(e.code=='Space'){e.preventDefault();if(P.ground)P.vy=6.2}
+  if(BM.on&&/^Digit[1-7]$/.test(e.code))BM.pick(+e.code.slice(5)-1);
   if(e.code=='KeyH'){if(P.med>0&&P.hp<100){P.med--;P.hp=Math.min(100,P.hp+50);say('Patched up.')}}
 });
 addEventListener('keyup',e=>keys[e.code]=false);
 let drag=false,lx=0,ly=0;
 const look=(dx,dy)=>{P.yaw-=dx*.0025;P.pitch=Math.max(-1.2,Math.min(1.1,P.pitch-dy*.0025))};
 addEventListener('mousemove',e=>{if(document.pointerLockElement)look(e.movementX,e.movementY);else if(drag){look(e.clientX-lx,e.clientY-ly);lx=e.clientX;ly=e.clientY}});
-renderer.domElement.addEventListener('mousedown',e=>{if(!started)return;if(!document.pointerLockElement){try{const p=renderer.domElement.requestPointerLock();p&&p.catch&&p.catch(()=>{})}catch(_){};drag=true;lx=e.clientX;ly=e.clientY}shoot()});
+renderer.domElement.addEventListener('mousedown',e=>{if(!started)return;if(!document.pointerLockElement){try{const p=renderer.domElement.requestPointerLock();p&&p.catch&&p.catch(()=>{})}catch(_){};drag=true;lx=e.clientX;ly=e.clientY}if(BM.on)BM.click(e.button);else shoot()});
+renderer.domElement.addEventListener('contextmenu',e=>e.preventDefault());
+addEventListener('wheel',e=>{if(BM.on)BM.pick((BM.sel+(e.deltaY>0?1:6))%7)});
 addEventListener('mouseup',()=>drag=false);
 
 /* ---------- actions ---------- */
@@ -328,7 +341,98 @@ function pickup(){let best=null,bd=2.6;for(const l of loot){const d=Math.hypot(l
 function collide(o,r){for(const s of solids){if(o.x>s.x0-r&&o.x<s.x1+r&&o.z>s.z0-r&&o.z<s.z1+r){
   const dx1=o.x-(s.x0-r),dx2=(s.x1+r)-o.x,dz1=o.z-(s.z0-r),dz2=(s.z1+r)-o.z,m=Math.min(dx1,dx2,dz1,dz2);
   if(m==dx1)o.x=s.x0-r;else if(m==dx2)o.x=s.x1+r;else if(m==dz1)o.z=s.z0-r;else o.z=s.z1+r}}
+  const f=o.y||0;for(const b of blocks.values()){if(b.y+1<=f+.05||b.y>=f+1.7)continue;
+    if(o.x>b.x-r&&o.x<b.x+1+r&&o.z>b.z-r&&o.z<b.z+1+r){const dx1=o.x-(b.x-r),dx2=(b.x+1+r)-o.x,dz1=o.z-(b.z-r),dz2=(b.z+1+r)-o.z,m=Math.min(dx1,dx2,dz1,dz2);
+      if(m==dx1)o.x=b.x-r;else if(m==dx2)o.x=b.x+1+r;else if(m==dz1)o.z=b.z-r;else o.z=b.z+1+r}}
   o.x=Math.max(-110,Math.min(110,o.x));o.z=Math.max(-110,Math.min(110,o.z))}
+
+
+/* ---------- block mode: Minecraft inside the apocalypse ----------
+   Voxel blocks live on a 1m grid keyed "x,y,z". They collide with the player,
+   Ellie and the infected, can be stacked and climbed, and TNT blows up both
+   blocks and infected (who drop as voxel debris). */
+const blocks=new Map();
+function px(draw){const c=document.createElement('canvas');c.width=c.height=16;const g=c.getContext('2d');draw(g);
+  const t=new THREE.CanvasTexture(c);t.magFilter=THREE.NearestFilter;t.minFilter=THREE.NearestFilter;t.encoding=THREE.sRGBEncoding;t.userData={url:c.toDataURL()};return t}
+function speck(g,base,cols,n=90){g.fillStyle=base;g.fillRect(0,0,16,16);for(let i=0;i<n;i++){g.fillStyle=cols[(R()*cols.length)|0];g.fillRect((R()*16)|0,(R()*16)|0,1,1)}}
+const PX={
+  dirt:px(g=>speck(g,'#866043',['#6c4a30','#9b7653','#593d29','#79553a'])),
+  grassTop:px(g=>speck(g,'#5d9b3a',['#4f8a2f','#6fb043','#47802a','#7bbf4c'])),
+  grassSide:px(g=>{speck(g,'#866043',['#6c4a30','#9b7653','#593d29']);g.fillStyle='#5d9b3a';g.fillRect(0,0,16,3);for(let x=0;x<16;x++)if(R()<.5){g.fillStyle='#4f8a2f';g.fillRect(x,3,1,1+((R()*2)|0))}}),
+  cobble:px(g=>{speck(g,'#7a7a7a',['#5e5e5e','#8f8f8f','#6b6b6b','#a0a0a0'],140);g.fillStyle='#4a4a4a';[[0,5,16,1],[0,11,16,1],[6,0,1,5],[11,5,1,6],[4,11,1,5]].forEach(r=>g.fillRect(...r))}),
+  planks:px(g=>{g.fillStyle='#a2834f';g.fillRect(0,0,16,16);g.fillStyle='#7d6239';[3,7,11,15].forEach(y=>g.fillRect(0,y,16,1));g.fillStyle='#b8945c';for(let i=0;i<30;i++)g.fillRect((R()*16)|0,(R()*16)|0,2,1);g.fillStyle='#6e5530';[[4,0],[12,4],[2,8],[9,12]].forEach(([x,y])=>g.fillRect(x,y,1,3))}),
+  log:px(g=>{g.fillStyle='#6b5232';g.fillRect(0,0,16,16);for(let x=0;x<16;x+=2){g.fillStyle=R()<.5?'#4f3c22':'#7d613c';g.fillRect(x,0,1,16)}}),
+  glass:px(g=>{g.clearRect(0,0,16,16);g.fillStyle='#c6e6ee';g.fillRect(0,0,16,1);g.fillRect(0,15,16,1);g.fillRect(0,0,1,16);g.fillRect(15,0,1,16);g.fillStyle='#ffffffaa';[[3,3],[4,4],[5,5],[10,9],[11,10]].forEach(([x,y])=>g.fillRect(x,y,1,1))}),
+  tntSide:px(g=>{g.fillStyle='#d23b2a';g.fillRect(0,0,16,16);g.fillStyle='#a72a1c';for(let x=1;x<16;x+=3)g.fillRect(x,0,1,16);g.fillStyle='#eee';g.fillRect(0,6,16,4);g.fillStyle='#222';g.font='bold 5px monospace';g.fillText('TNT',2,10)}),
+  tntTop:px(g=>{g.fillStyle='#d23b2a';g.fillRect(0,0,16,16);g.fillStyle='#ddd';g.fillRect(5,5,6,6);g.fillStyle='#333';g.fillRect(7,7,2,2)}),
+  glow:px(g=>speck(g,'#e8c25a',['#fff0a0','#b8902e','#ffd76a','#c99a3a'],120)),
+  diamond:px(g=>{speck(g,'#7a7a7a',['#6b6b6b','#8f8f8f'],60);g.fillStyle='#5de8e0';[[3,3],[4,4],[10,5],[11,4],[6,10],[7,11],[12,11]].forEach(([x,y])=>g.fillRect(x,y,2,2))}),
+};
+const lam=(t,o={})=>new THREE.MeshLambertMaterial(Object.assign({map:t},o));
+const BT=[
+  {n:'Grass Block',m:[lam(PX.grassSide),lam(PX.grassSide),lam(PX.grassTop),lam(PX.dirt),lam(PX.grassSide),lam(PX.grassSide)],icon:PX.grassSide},
+  {n:'Cobblestone',m:lam(PX.cobble),icon:PX.cobble},
+  {n:'Oak Planks',m:lam(PX.planks),icon:PX.planks},
+  {n:'Oak Log',m:lam(PX.log),icon:PX.log},
+  {n:'Glass',m:lam(PX.glass,{transparent:true,alphaTest:.1}),icon:PX.glass},
+  {n:'Glowstone',m:lam(PX.glow,{emissive:0xffcc55,emissiveMap:PX.glow}),icon:PX.glow,light:true},
+  {n:'TNT',m:[lam(PX.tntSide),lam(PX.tntSide),lam(PX.tntTop),lam(PX.tntTop),lam(PX.tntSide),lam(PX.tntSide)],icon:PX.tntSide,tnt:true},
+];
+const cubeG=new THREE.BoxGeometry(1,1,1);
+const key=(x,y,z)=>x+','+y+','+z;
+function putBlock(x,y,z,t){const k=key(x,y,z);if(blocks.has(k)||y<0||y>40)return null;const T0=BT[t];const m=new THREE.Mesh(cubeG,T0.m);m.position.set(x+.5,y+.5,z+.5);m.castShadow=m.receiveShadow=true;
+  const b={x,y,z,t,m};m.userData.block=b;if(T0.light){const l=new THREE.PointLight(0xffcc66,1.2,9,2);m.add(l)}scene.add(m);blocks.set(k,b);return b}
+function dropBlock(b,fx=true){blocks.delete(key(b.x,b.y,b.z));scene.remove(b.m);if(fx)debris(b.m.position,BT[b.t].icon,6)}
+const bits=[];const bitG=new THREE.BoxGeometry(.18,.18,.18);
+function debris(pos,icon,n){const mat=new THREE.MeshLambertMaterial({map:icon});for(let i=0;i<n;i++){const m=new THREE.Mesh(bitG,mat);m.position.copy(pos).add(new THREE.Vector3(R()-.5,R()-.5,R()-.5).multiplyScalar(.6));scene.add(m);
+  bits.push({m,v:new THREE.Vector3((R()-.5)*5,2+R()*4,(R()-.5)*5),t:1.2+R()*.8})}}
+// height of the highest block surface under (x,z) that is at or below feet+step
+function floorAt(x,z,feet){let h=0;const bx=Math.floor(x),bz=Math.floor(z);for(const b of blocks.values()){if(b.y+1<=feet+.3&&b.y+1>h&&x>b.x-.3&&x<b.x+1.3&&z>b.z-.3&&z<b.z+1.3)h=b.y+1}return h}
+function ceilAt(x,z,feet){let c=1e9;for(const b of blocks.values()){if(b.y>=feet+.5&&b.y<c&&x>b.x-.3&&x<b.x+1.3&&z>b.z-.3&&z<b.z+1.3)c=b.y}return c}
+const fuses=[];
+function explode(cx,cy,cz){const R0=3.2;
+  for(const b of [...blocks.values()]){const d=Math.hypot(b.x+.5-cx,b.y+.5-cy,b.z+.5-cz);if(d<R0){if(BT[b.t].tnt&&!b.lit){b.lit=true;fuses.push({b,t:.25+R()*.4})}else if(!BT[b.t].tnt)dropBlock(b)}}
+  for(const e of enemies){if(e.dead)continue;const d=Math.hypot(e.g.position.x-cx,e.g.position.z-cz);if(d<6){e.hp=0;e.dead=true;killVisual(e);e.sil.visible=false;
+    const p=e.g.position;for(let i=0;i<4;i++)putBlock(Math.floor(p.x+(R()-.5)*2),0,Math.floor(p.z+(R()-.5)*2),i%2?0:3);debris(p.clone().setY(1),PX.dirt,10)}
+    else if(d<14){e.state='chase';e.alert=10;e.tx=cx;e.tz=cz}}
+  const pd=Math.hypot(P.x-cx,P.y+1-cy,P.z-cz);if(pd<4.5){P.hp-=Math.round(60*(1-pd/4.5));P.hurtT=.8;snd('hurt');P.vy=5;if(P.hp<=0&&P.alive){P.alive=false;end(false)}}
+  const fb=new THREE.Mesh(new THREE.SphereGeometry(1,12,8),new THREE.MeshBasicMaterial({color:0xffd27a,transparent:true,opacity:.9,depthWrite:false}));fb.position.set(cx,cy,cz);scene.add(fb);burst.push({m:fb,t:1});
+  debris(new THREE.Vector3(cx,cy,cz),PX.tntSide,14);makeNoise(70,cx,cz);shakeT=.5;$('shake').style.opacity=.6;
+  if(OG.audio.ready){OG.audio.play('ignite',{pos:{x:cx,y:cy,z:cz},vol:1});OG.audio.thunder(0,.8)}else snd('pop')}
+let shakeT=0;
+const BM={on:false,sel:0,seen:false,cd:0,arm:null,held:null,
+  toggle(){this.on=!this.on;gun.visible=!this.on;this.arm.visible=this.on;$('hotbar').hidden=$('bname').hidden=!this.on;
+    if(this.on&&!this.seen){this.seen=true;say('Block mode. 1-7 or wheel picks · click mine · right-click place · hit TNT to light it',5);ellieSay('Is that... a grass block? Where did you even get that?',3)}
+    this.pick(this.sel)},
+  pick(i){this.sel=i;[...$('hotbar').children].forEach((d,j)=>d.className=j==i?'on':'');$('bname').textContent=BT[i].n;$('bname').style.opacity=1;this.nameT=2;
+    this.held.material=BT[i].m},
+  target(){ray.setFromCamera({x:0,y:0},cam);ray.far=7;const list=[...blocks.values()].map(b=>b.m);list.push(ground);
+    const h=ray.intersectObjects(list,false)[0];ray.far=Infinity;return h},
+  click(btn){if(!P.alive||this.cd>0)return;this.cd=.18;this.arm.rotation.x=-.6;const h=this.target();if(!h)return;
+    const b=h.object.userData.block;
+    if(btn===0){if(!b)return;if(BT[b.t].tnt){if(!b.lit){b.lit=true;fuses.push({b,t:2.2});snd('click');say('Fuse lit. Run.',1.2)}return}
+      dropBlock(b);if(OG.audio.ready)OG.audio.play('step_concrete',{pos:{x:b.x,y:b.y,z:b.z},vol:.6});else snd('clang');makeNoise(6,b.x,b.z);return}
+    if(btn===2){let x,y,z;if(b){const n=h.face.normal;x=b.x+n.x;y=b.y+n.y;z=b.z+n.z}else{x=Math.floor(h.point.x);y=0;z=Math.floor(h.point.z)}
+      // never place a block inside the player
+      if(x+1>P.x-.45&&x<P.x+.45&&z+1>P.z-.45&&z<P.z+.45&&y+1>P.y&&y<P.y+1.8)return;
+      if(putBlock(x,y,z,this.sel)){if(OG.audio.ready)OG.audio.play('pick',{vol:.4});else snd('pick')}}},
+  update(dt){this.cd-=dt;this.arm.rotation.x*=.8;this.arm.position.y=-.42+Math.sin(P.bob*.5)*.02;
+    if(this.nameT>0){this.nameT-=dt;if(this.nameT<=0)$('bname').style.opacity=0}
+    for(let i=fuses.length-1;i>=0;i--){const f=fuses[i];f.t-=dt;f.b.m.material=(Math.floor(f.t*8)%2)?BT[6].m:this.white;f.b.m.scale.setScalar(1+Math.max(0,.5-f.t)*.3);
+      if(f.t<=0){fuses.splice(i,1);if(blocks.has(key(f.b.x,f.b.y,f.b.z))){dropBlock(f.b,false);explode(f.b.x+.5,f.b.y+.5,f.b.z+.5)}}}
+    for(let i=bits.length-1;i>=0;i--){const q=bits[i];q.t-=dt;q.v.y-=14*dt;q.m.position.addScaledVector(q.v,dt);if(q.m.position.y<.09){q.m.position.y=.09;q.v.multiplyScalar(.5);q.v.y*=-.3}
+      q.m.rotation.x+=dt*4;if(q.t<=0){scene.remove(q.m);bits.splice(i,1)}}
+    if(shakeT>0){shakeT-=dt;cam.position.x+=(R()-.5)*shakeT*.6;cam.position.y+=(R()-.5)*shakeT*.6;if(shakeT<=0)$('shake').style.opacity=0}}};
+BM.white=new THREE.MeshBasicMaterial({color:0xffffff});
+{const skin=px(g=>speck(g,'#c69c7a',['#b88a68','#d4ab88'],40)),sleeve=px(g=>speck(g,'#3a7f9a',['#2f6a82','#4790ad'],40));
+  const arm=new THREE.Group();const fore=new THREE.Mesh(new THREE.BoxGeometry(.16,.16,.6),[lam(skin),lam(skin),lam(skin),lam(skin),lam(skin),lam(skin)]);fore.position.set(0,0,-.15);
+  const cuff=new THREE.Mesh(new THREE.BoxGeometry(.17,.17,.22),lam(sleeve));cuff.position.z=.15;arm.add(fore,cuff);
+  const held=new THREE.Mesh(cubeG,BT[0].m);held.scale.setScalar(.22);held.position.set(-.05,.14,-.42);held.rotation.set(.2,.7,0);arm.add(held);
+  arm.position.set(.38,-.42,-.55);arm.rotation.set(0,-.25,0);arm.visible=false;cam.add(arm);BM.arm=arm;BM.held=held;
+  $('hotbar').innerHTML=BT.map((b,i)=>`<div style="background-image:url(${b.icon.userData.url})"><b>${i+1}</b></div>`).join('')}
+// a small starter build near spawn so the mash-up reads at first glance
+[[3,0,6,0],[4,0,6,0],[5,0,6,1],[5,1,6,1],[5,2,6,5],[3,0,7,6],[-4,0,5,3],[-4,1,5,3],[-4,2,5,3],[-5,0,5,2],[-3,0,5,2],[-4,3,5,5]].forEach(([x,y,z,t])=>putBlock(x,y,z,t));
+if(/debug/.test(location.hash))window.__bm={BM,blocks,putBlock,fuses};
 
 /* ---------- loop ---------- */
 const clock=new THREE.Clock();let clickT=0,stingT=0,stepPh=0;
@@ -361,10 +465,12 @@ function update(dt){
       P.x+=(-Math.sin(P.yaw)*f+Math.cos(P.yaw)*s)*sp*dt;P.z+=(-Math.cos(P.yaw)*f-Math.sin(P.yaw)*s)*sp*dt;P.bob+=dt*sp*1.6;stepPh+=dt*sp*.55;if(stepPh>1&&OG.audio.ready){stepPh=0;OG.audio.play(P.sprint?'step_asphalt':'step_concrete',{vol:P.crouch?.12:P.sprint?.5:.3})}
       if(P.sprint)makeNoise(Math.max(heard0.r,22));else if(!P.crouch)makeNoise(Math.max(heard0.r,7))}
     collide(P,.45);
+    {const fl=floorAt(P.x,P.z,P.y),ce=ceilAt(P.x,P.z,P.y);P.vy-=18*dt;P.y+=P.vy*dt;
+      if(P.y<=fl){P.y=fl;P.vy=0;P.ground=true}else P.ground=false;if(P.y+1.8>ce&&P.vy>0){P.y=ce-1.8;P.vy=0}}
     if(P.parts>=5&&Math.hypot(P.x-tower.position.x,P.z-tower.position.z)<5){P.won=true;end(true)}
   }
   const eh=P.crouch?1.0:1.65;
-  cam.position.set(P.x,eh+Math.sin(P.bob)*.05,P.z);cam.rotation.set(P.pitch,P.yaw,0,'YXZ');
+  cam.position.set(P.x,P.y+eh+Math.sin(P.bob)*.05,P.z);BM.update(dt);cam.rotation.set(P.pitch,P.yaw,0,'YXZ');
   gun.position.y=-.25+Math.sin(P.bob*.5)*.01;
   flash.intensity=flashOn?2.4:0;flash.position.copy(cam.position);const fwd=new THREE.Vector3(0,0,-1).applyQuaternion(cam.quaternion);flash.target.position.copy(cam.position).add(fwd);
   sun.position.set(P.x+40,60,P.z+20);sun.target.position.set(P.x,0,P.z);sun.target.updateMatrixWorld();
