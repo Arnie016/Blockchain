@@ -38,6 +38,10 @@ canvas{display:block}
 #hotbar div.on{border-color:#fff;box-shadow:0 0 0 2px #000}
 #hotbar div b{position:absolute;right:2px;bottom:0;font:600 10px var(--mono);color:#fff;text-shadow:1px 1px 0 #000}
 #bname{position:absolute;left:50%;bottom:calc(142px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);font:600 13px var(--mono);color:#fff;text-shadow:2px 2px 0 #3f3f3f}
+#squad{position:absolute;right:16px;top:calc(16px + env(safe-area-inset-top,0px));width:250px;background:#0d100cd0;border:1px solid #e8e1cf30;padding:8px 10px;font-size:11px;line-height:1.7}
+#squad .h{font-family:var(--display);font-size:14px;margin-bottom:2px}
+#squad .r{display:flex;justify-content:space-between;gap:8px}#squad .r i{font-style:normal;color:var(--dim)}
+#squad .pass{color:#8fd35a}#squad .fail{color:#ff7a5a}#squad .run{color:#d8a640}#squad .wait{color:#8ac8ff}
 #shake{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none}
 #menu{position:fixed;inset:0;display:grid;place-items:center;background:radial-gradient(ellipse at 50% 40%,#1b2214cc,#050604f2);pointer-events:auto;padding:16px}
 #menu .card{max-width:520px;display:grid;gap:14px}
@@ -61,8 +65,8 @@ canvas{display:block}
     <div class="lbl">Revolver</div><div class="big" id="ammo">6 · 12</div>
     <div class="lbl" id="inv2"></div><div class="lbl" id="inv">Rags 0 · Alcohol 0 · Medkits 1</div>
   </div>
-  <div class="bl">WASD move · mouse look · click shoot · R reload · Shift sprint · C crouch · E loot · G throw brick · V stealth kill · B block mode · Space jump · hold Tab listen · Q medkit · H heal · F light</div>
-  <div id="compass"></div><div id="listen"></div><div id="bolt"></div><div id="ellie"></div><div id="prompt"></div><div id="cross"></div><div id="hurt"></div><div id="msg"></div><div id="hotbar" hidden></div><div id="bname" hidden></div><div id="shake"></div>
+  <div class="bl">WASD move · mouse look · click shoot · R reload · Shift sprint · C crouch · E loot · G throw brick · V stealth kill · B block mode · N agent squad · Space jump · hold Tab listen · Q medkit · H heal · F light</div>
+  <div id="compass"></div><div id="listen"></div><div id="bolt"></div><div id="ellie"></div><div id="prompt"></div><div id="cross"></div><div id="hurt"></div><div id="msg"></div><div id="hotbar" hidden></div><div id="bname" hidden></div><div id="shake"></div><div id="squad" hidden></div>
 </div>
 
 <div id="menu"><div class="card">
@@ -298,6 +302,8 @@ addEventListener('keydown',e=>{keys[e.code]=true;if(!started||!P.alive)return;
   if(e.code=='KeyE')pickup();
   if(e.code=='KeyQ'){if(P.rags>=1&&P.alc>=1){P.rags--;P.alc--;P.med++;say('Crafted a medkit.');snd('pick')}else say('Need 1 rag and 1 alcohol to craft.')}
   if(e.code=='KeyB')BM.toggle();
+  if(e.code=='KeyN')SQ.deploy();
+  if(e.code=='KeyY')SQ.approve();
   if(e.code=='Space'){e.preventDefault();if(P.ground)P.vy=6.2}
   if(BM.on&&/^Digit[1-7]$/.test(e.code))BM.pick(+e.code.slice(5)-1);
   if(e.code=='KeyH'){if(P.med>0&&P.hp<100){P.med--;P.hp=Math.min(100,P.hp+50);say('Patched up.')}}
@@ -390,17 +396,19 @@ function debris(pos,icon,n){const mat=new THREE.MeshLambertMaterial({map:icon});
 function floorAt(x,z,feet){let h=0;const bx=Math.floor(x),bz=Math.floor(z);for(const b of blocks.values()){if(b.y+1<=feet+.3&&b.y+1>h&&x>b.x-.3&&x<b.x+1.3&&z>b.z-.3&&z<b.z+1.3)h=b.y+1}return h}
 function ceilAt(x,z,feet){let c=1e9;for(const b of blocks.values()){if(b.y>=feet+.5&&b.y<c&&x>b.x-.3&&x<b.x+1.3&&z>b.z-.3&&z<b.z+1.3)c=b.y}return c}
 const fuses=[];
+function shielded(ax,ay,az,bx,by,bz){if(!BM.occlusion)return false;const L=Math.hypot(bx-ax,by-ay,bz-az);
+  for(let t=.7;t<L-.6;t+=.35){const k=key(Math.floor(ax+(bx-ax)*t/L),Math.floor(ay+(by-ay)*t/L),Math.floor(az+(bz-az)*t/L)),b=blocks.get(k);if(b&&b.t==1)return true}return false}
 function explode(cx,cy,cz){const R0=3.2;
-  for(const b of [...blocks.values()]){const d=Math.hypot(b.x+.5-cx,b.y+.5-cy,b.z+.5-cz);if(d<R0){if(BT[b.t].tnt&&!b.lit){b.lit=true;fuses.push({b,t:.25+R()*.4})}else if(!BT[b.t].tnt)dropBlock(b)}}
-  for(const e of enemies){if(e.dead)continue;const d=Math.hypot(e.g.position.x-cx,e.g.position.z-cz);if(d<6){e.hp=0;e.dead=true;killVisual(e);e.sil.visible=false;
+  for(const b of [...blocks.values()]){const d=Math.hypot(b.x+.5-cx,b.y+.5-cy,b.z+.5-cz);if(BM.occlusion&&b.t==1&&d>=1.6)continue;if(d<R0&&!shielded(cx,cy,cz,b.x+.5,b.y+.5,b.z+.5)){if(BT[b.t].tnt&&!b.lit){b.lit=true;fuses.push({b,t:.25+R()*.4})}else if(!BT[b.t].tnt)dropBlock(b)}}
+  for(const e of enemies){if(e.dead)continue;const d=Math.hypot(e.g.position.x-cx,e.g.position.z-cz);if(d<6&&!shielded(cx,cy,cz,e.g.position.x,1,e.g.position.z)){e.hp=0;e.dead=true;killVisual(e);e.sil.visible=false;
     const p=e.g.position;for(let i=0;i<4;i++)putBlock(Math.floor(p.x+(R()-.5)*2),0,Math.floor(p.z+(R()-.5)*2),i%2?0:3);debris(p.clone().setY(1),PX.dirt,10)}
     else if(d<14){e.state='chase';e.alert=10;e.tx=cx;e.tz=cz}}
-  const pd=Math.hypot(P.x-cx,P.y+1-cy,P.z-cz);if(pd<4.5){P.hp-=Math.round(60*(1-pd/4.5));P.hurtT=.8;snd('hurt');P.vy=5;if(P.hp<=0&&P.alive){P.alive=false;end(false)}}
+  const pd=Math.hypot(P.x-cx,P.y+1-cy,P.z-cz);if(pd<4.5&&!shielded(cx,cy,cz,P.x,P.y+1,P.z)){P.hp-=Math.round(60*(1-pd/4.5));P.hurtT=.8;snd('hurt');P.vy=5;if(P.hp<=0&&P.alive){P.alive=false;end(false)}}
   const fb=new THREE.Mesh(new THREE.SphereGeometry(1,12,8),new THREE.MeshBasicMaterial({color:0xffd27a,transparent:true,opacity:.9,depthWrite:false}));fb.position.set(cx,cy,cz);scene.add(fb);burst.push({m:fb,t:1});
   debris(new THREE.Vector3(cx,cy,cz),PX.tntSide,14);makeNoise(70,cx,cz);shakeT=.5;$('shake').style.opacity=.6;
   if(OG.audio.ready){OG.audio.play('ignite',{pos:{x:cx,y:cy,z:cz},vol:1});OG.audio.thunder(0,.8)}else snd('pop')}
 let shakeT=0;
-const BM={on:false,sel:0,seen:false,cd:0,arm:null,held:null,
+const BM={occlusion:false,on:false,sel:0,seen:false,cd:0,arm:null,held:null,
   toggle(){this.on=!this.on;gun.visible=!this.on;this.arm.visible=this.on;$('hotbar').hidden=$('bname').hidden=!this.on;
     if(this.on&&!this.seen){this.seen=true;say('Block mode. 1-7 or wheel picks · click mine · right-click place · hit TNT to light it',5);ellieSay('Is that... a grass block? Where did you even get that?',3)}
     this.pick(this.sel)},
@@ -432,7 +440,90 @@ BM.white=new THREE.MeshBasicMaterial({color:0xffffff});
   $('hotbar').innerHTML=BT.map((b,i)=>`<div style="background-image:url(${b.icon.userData.url})"><b>${i+1}</b></div>`).join('')}
 // a small starter build near spawn so the mash-up reads at first glance
 [[3,0,6,0],[4,0,6,0],[5,0,6,1],[5,1,6,1],[5,2,6,5],[3,0,7,6],[-4,0,5,3],[-4,1,5,3],[-4,2,5,3],[-5,0,5,2],[-3,0,5,2],[-4,3,5,5]].forEach(([x,y,z,t])=>putBlock(x,y,z,t));
-if(/debug/.test(location.hash))window.__bm={BM,blocks,putBlock,fuses};
+
+/* ---------- agent squad: an AgentCraft-style test team living in the game ----------
+   Each agent owns one TNT/block test. It walks to its site, builds the rig block by
+   block, lights it, then asserts on the real game state (blocks map, enemies,
+   collide()). Its log scrolls on a board above its head. A failing agent walks over
+   to the player and waits for approval (Y) to patch the engine, then re-runs. */
+function villager(robe){const g=new THREE.Group();const skin=lam(px(q=>speck(q,'#b4886a',['#a27858','#c29676'],40)));
+  const rb=lam(px(q=>speck(q,robe,['#0003','#fff2'],60)));
+  const body=new THREE.Mesh(new THREE.BoxGeometry(.6,1.1,.4),rb);body.position.y=.95;
+  const head=new THREE.Mesh(new THREE.BoxGeometry(.5,.6,.5),skin);head.position.y=1.8;
+  const nose=new THREE.Mesh(new THREE.BoxGeometry(.12,.24,.12),skin);nose.position.set(0,1.7,-.3);
+  const brow=new THREE.Mesh(new THREE.BoxGeometry(.5,.08,.04),lam(px(q=>{q.fillStyle='#3a2618';q.fillRect(0,0,16,16)})));brow.position.set(0,1.92,-.26);
+  const arms=new THREE.Mesh(new THREE.BoxGeometry(.7,.22,.26),rb);arms.position.set(0,1.15,-.22);
+  const legs=[-1,1].map(s=>{const l=new THREE.Mesh(new THREE.BoxGeometry(.22,.4,.22),rb);l.position.set(.14*s,.2,0);g.add(l);return l});
+  g.add(body,head,nose,brow,arms);g.traverse(o=>{if(o.isMesh)o.castShadow=true});g.userData.legs=legs;return g}
+function board(){const c=document.createElement('canvas');c.width=320;c.height=180;const t=new THREE.CanvasTexture(c);t.encoding=THREE.sRGBEncoding;
+  const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:t,depthWrite:false}));sp.scale.set(2.6,1.46,1);sp.position.y=3.15;return {c,t,sp}}
+function drawBoard(a){const g=a.bd.c.getContext('2d');g.fillStyle='#2d3a2c';g.fillRect(0,0,320,180);g.strokeStyle='#c9a640';g.lineWidth=8;g.strokeRect(4,4,312,172);
+  g.font='600 15px monospace';g.fillStyle=a.color;g.fillText('● '+a.name+' · '+a.test.title,16,30);g.font='13px monospace';
+  a.lines.slice(-8).forEach((l,i)=>{g.fillStyle=l[0]=='✓'?'#9be36a':l[0]=='✗'?'#ff8a6a':l[0]=='?'?'#8ac8ff':'#e6e2d2';g.fillText(l.slice(0,38),16,54+i*15)});a.bd.t.needsUpdate=true}
+const blockAt=(x,y,z)=>blocks.get(key(x,y,z));
+function lightAt(x,y,z,t=2.2){const b=blockAt(x,y,z);if(b&&!b.lit){b.lit=true;fuses.push({b,t})}}
+// each test is a generator: yield actions, return true/false. site=[x,z] is its own patch of ground.
+const TESTS=[
+  {title:'chain reaction',site:[16,-6],*run(a,[x,z]){
+    a.log('plan: 4 TNT, 2 apart, light #1');for(let i=0;i<4;i++){yield {walk:[x+i*2,z+2]};yield {place:[x+i*2,0,z,6]}}
+    yield {walk:[x-1,z+1]};a.log('light first fuse');lightAt(x,0,z);yield {walk:[x-9,z+6]};
+    const ok=yield {until:()=>[0,1,2,3].every(i=>!blockAt(x+i*2,0,z)),timeout:9};
+    a.log((ok?'✓':'✗')+' '+[0,1,2,3].filter(i=>!blockAt(x+i*2,0,z)).length+'/4 detonated');return ok}},
+  {title:'blast radius',site:[-18,-4],*run(a,[x,z]){
+    a.log('plan: TNT, cobble @2m, planks @5m');yield {walk:[x,z+2]};yield {place:[x,0,z,6]};yield {place:[x+2,0,z,1]};yield {walk:[x+4,z+2]};yield {place:[x+5,0,z,2]};
+    yield {walk:[x,z+1]};lightAt(x,0,z);a.log('lit. backing off');yield {walk:[x-6,z+8]};
+    yield {until:()=>!blockAt(x,0,z),timeout:9};yield {wait:.4};
+    const near=!blockAt(x+2,0,z),far=!!blockAt(x+5,0,z);a.log((near?'✓':'✗')+' 2m cobble destroyed');a.log((far?'✓':'✗')+' 5m planks survived');
+    if(blockAt(x+5,0,z))dropBlock(blockAt(x+5,0,z));return near&&far}},
+  {title:'cover blocks blast',site:[-4,-26],*run(a,[x,z]){
+    a.log('plan: TNT | cobble wall | planks');yield {walk:[x,z-2]};yield {place:[x,0,z,6]};
+    for(const dx of [-1,0,1])for(const y of [0,1])yield {place:[x+dx,y,z+2,1]};yield {walk:[x,z+4]};yield {place:[x,0,z+3,2]};
+    yield {walk:[x+1,z-1]};lightAt(x,0,z);a.log('lit. hiding');yield {walk:[x+8,z-6]};
+    yield {until:()=>!blockAt(x,0,z),timeout:9};yield {wait:.4};const ok=!!blockAt(x,0,z+3);
+    a.log(ok?'✓ planks safe behind wall':'✗ blast went through the wall');
+    for(const b of [...blocks.values()])if(Math.abs(b.x-x)<=1&&b.z>=z+2&&b.z<=z+3)dropBlock(b,false);return ok},
+    fix:'Blast ignores cover. Y = let me patch explode() so cobble shields and resists.',apply(){BM.occlusion=true}},
+  {title:'walls stop infected',site:[22,14],*run(a,[x,z]){
+    a.log('plan: cobble wall, probe collide()');for(const dz of [0,1,2])yield {place:[x,0,z+dz,1]};
+    const probe={x:x+.5,z:z+1.5,y:0};collide(probe,.4);const moved=Math.hypot(probe.x-(x+.5),probe.z-(z+1.5))>.5;
+    a.log((moved?'✓':'✗')+' probe pushed '+Math.hypot(probe.x-(x+.5),probe.z-(z+1.5)).toFixed(2)+'m');
+    const top={x:x+.5,z:z+1.5,y:1.05};collide(top,.4);const free=Math.hypot(top.x-(x+.5),top.z-(z+1.5))<.01;a.log((free?'✓':'✗')+' standing on top is free');
+    for(const dz of [0,1,2])dropBlock(blockAt(x,0,z+dz));return moved&&free}},
+  {title:'demolish a clicker',site:null,*run(a){
+    let e=null,bd=1e9;for(const q of enemies)if(!q.dead&&q.type!='bloater'){const d=Math.hypot(q.g.position.x-a.g.position.x,q.g.position.z-a.g.position.z);if(d<bd){bd=d;e=q}}
+    if(!e){a.log('no live infected. skip');return true}
+    a.log('target '+e.type+' '+Math.round(bd)+'m away');e.stun=40;const p=e.g.position;yield {walk:[p.x+2,p.z+2]};
+    const tx=Math.floor(p.x)+1,tz=Math.floor(p.z);yield {place:[tx,0,tz,6]};lightAt(tx,0,tz,1.6);a.log('lit next to it');yield {walk:[p.x+12,p.z+10]};
+    const ok=yield {until:()=>e.dead,timeout:9};a.log(ok?'✓ target down, voxelized':'✗ target survived');return ok}},
+];
+const NAMES=[['Kit','#3a7f9a'],['Roan','#8a4a9a'],['Mira','#4a8a3a'],['Juno','#a8643a'],['Pax','#9a3a3a']];
+const SQ={on:false,agents:[],pending:null,
+  deploy(){if(this.on){$('squad').hidden=!$('squad').hidden;return}this.on=true;$('squad').hidden=false;if(!BM.on)BM.toggle();
+    TESTS.forEach((test,i)=>{const [name,color]=NAMES[i];const g=villager(color);const ang=i/TESTS.length*6.28;g.position.set(P.x+Math.cos(ang)*3,0,P.z+Math.sin(ang)*3);scene.add(g);
+      const bd=board();g.add(bd.sp);const a={name,color,test,g,bd,lines:[],act:null,gen:null,status:'run',runs:0,stuckT:0,
+        log(t){this.lines.push(t);drawBoard(this)}};a.gen=test.run(a,test.site);this.agents.push(a);a.log('assigned: '+test.title)});
+    say('Agent squad deployed. 5 agents running TNT tests.',3);ellieSay('Who are these guys? Why are they carrying dynamite?',3)},
+  approve(){const a=this.pending;if(!a)return;this.pending=null;a.test.apply();a.log('✓ patch applied. re-running');a.status='run';a.runs++;a.gen=a.test.run(a,a.test.site);a.act=null;
+    say(a.name+' patched the engine: cover now shields blasts.',3)},
+  update(dt){if(!this.on)return;
+    for(const a of this.agents){const g=a.g.position;let sp=0;
+      if(!a.act&&a.status=='run'){const r=a.gen.next(a.res);a.res=undefined;
+        if(r.done){a.status=r.value?'pass':'fail';a.log(r.value?'✓ PASS':'✗ FAIL');
+          if(!r.value&&a.test.fix&&!a.runs){a.status='wait';a.act={walk:'player'};a.log('? need you. walking over')}}
+        else a.act=r.value}
+      const A=a.act;
+      if(A){if(A.walk){const [tx,tz]=A.walk=='player'?[P.x+Math.sin(P.yaw)*-2,P.z+Math.cos(P.yaw)*-2]:A.walk;const dx=tx-g.x,dz=tz-g.z,d=Math.hypot(dx,dz);
+          if(d<(A.walk=='player'?1.2:.5)){if(A.walk=='player'){if(!this.pending){this.pending=a;say(a.name+': '+a.test.fix,8);a.log('? press Y to approve')}a.g.rotation.y=Math.atan2(-(P.x-g.x),-(P.z-g.z))}else a.act=null}
+          else{sp=4.6;const o={x:g.x+dx/d*sp*dt,z:g.z+dz/d*sp*dt,y:0};collide(o,.35);const moved=Math.hypot(o.x-g.x,o.z-g.z);g.x=o.x;g.z=o.z;a.g.rotation.y=Math.atan2(-dx,-dz);
+            a.stuckT=moved<sp*dt*.3?a.stuckT+dt:0;if(a.stuckT>1.5){g.x=tx;g.z=tz;a.stuckT=0}}}
+        else if(A.place){const [x,y,z,t]=A.place;putBlock(x,y,z,t);if(OG.audio.ready)OG.audio.play('pick',{pos:{x,y,z},vol:.25});a.act={wait:.3};a.log('place '+BT[t].n+' '+x+','+y+','+z)}
+        else if(A.wait!=null){A.wait-=dt;if(A.wait<=0)a.act=null}
+        else if(A.until){A.timeout-=dt;if(A.until()){a.res=true;a.act=null}else if(A.timeout<=0){a.res=false;a.act=null}}}
+      const sw=Math.sin(clock.elapsedTime*10)*(sp?.5:0);a.g.userData.legs[0].rotation.x=sw;a.g.userData.legs[1].rotation.x=-sw}
+    const cls={pass:'pass',fail:'fail',run:'run',wait:'wait'},lbl={pass:'PASS',fail:'FAIL',run:'running',wait:'needs you · Y'};
+    const n=this.agents.filter(a=>a.status=='pass').length;
+    $('squad').innerHTML=`<div class="h">Agent squad · ${n}/${this.agents.length} green</div>`+this.agents.map(a=>`<div class="r"><span style="color:${a.color}">${a.name}</span><i>${a.test.title}</i><b class="${cls[a.status]}">${lbl[a.status]}</b></div>`).join('')}};
+if(/debug/.test(location.hash))window.__bm={BM,blocks,putBlock,fuses,SQ};
 
 /* ---------- loop ---------- */
 const clock=new THREE.Clock();let clickT=0,stingT=0,stepPh=0;
@@ -470,7 +561,7 @@ function update(dt){
     if(P.parts>=5&&Math.hypot(P.x-tower.position.x,P.z-tower.position.z)<5){P.won=true;end(true)}
   }
   const eh=P.crouch?1.0:1.65;
-  cam.position.set(P.x,P.y+eh+Math.sin(P.bob)*.05,P.z);BM.update(dt);cam.rotation.set(P.pitch,P.yaw,0,'YXZ');
+  cam.position.set(P.x,P.y+eh+Math.sin(P.bob)*.05,P.z);BM.update(dt);SQ.update(dt);cam.rotation.set(P.pitch,P.yaw,0,'YXZ');
   gun.position.y=-.25+Math.sin(P.bob*.5)*.01;
   flash.intensity=flashOn?2.4:0;flash.position.copy(cam.position);const fwd=new THREE.Vector3(0,0,-1).applyQuaternion(cam.quaternion);flash.target.position.copy(cam.position).add(fwd);
   sun.position.set(P.x+40,60,P.z+20);sun.target.position.set(P.x,0,P.z);sun.target.updateMatrixWorld();
