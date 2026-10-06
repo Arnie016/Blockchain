@@ -77,6 +77,7 @@
   Pl.target = () => {
     const G = LC.G, p = G.player, a = p.aim;
     const inReach = (x, y, r = REACH) => U.dist2(p.x, p.y, x, y) < r * r;
+    if (LC.R.is3D && p.aimWho && !p.aimWho.gone && inReach(p.aimWho.x, p.aimWho.y, REACH + 14)) return { kind: 'npc', n: p.aimWho };
     const n = Pl.npcAt(a.x, a.y);
     if (n && inReach(n.x, n.y, REACH + 10)) return { kind: 'npc', n };
     const pr = Wd.nearestProp(a.x, a.y, 20, (q) => !q.carriedBy && !q.broken && q.kind !== 'balloon');
@@ -318,6 +319,7 @@
     LC.sfx('thud', p.x, p.y);
     LC.R.cam.shake = 6;
     LC.stat('timesYouFell');
+    if (LC.Aura) LC.Aura.add(-50, 'Fell over. Everyone saw.');
   };
   Pl.hit = (by, dir) => {
     const p = LC.G.player;
@@ -325,6 +327,7 @@
     p.body.vx += Math.cos(dir) * 140; p.body.vy += Math.sin(dir) * 100;
     LC.R.cam.shake = 8;
     LC.stat('timesYouGotHit');
+    if (LC.Aura) LC.Aura.add(-40, 'Got punched');
     if (p.grab) { p.grab.hold -= 0.35; }
     Pl.say(U.pick(['OW.', 'Right.', 'Okay. OKAY.', 'That was a mistake.']));
   };
@@ -401,7 +404,7 @@
     p.room = M.roomAt(b.x, b.y);
     // aim
     const mw = LC.R.toWorld(input.mx, input.my);
-    p.aim.x = mw.x; p.aim.y = mw.y;
+    p.aim.x = mw.x; p.aim.y = mw.y; p.aimWho = mw.who || null;
     // knocked down
     if (p.down > 0) {
       p.down -= dt;
@@ -432,7 +435,9 @@
     const sp = Math.hypot(b.vx, b.vy);
     // face the cursor (or the direction of travel on touch)
     const aimAng = Math.atan2(p.aim.y - p.y, p.aim.x - p.x);
-    const target = input.touch && ml > 0.2 && !input.aimed ? Math.atan2(my, mx) : aimAng;
+    let target = input.touch && ml > 0.2 && !input.aimed ? Math.atan2(my, mx) : aimAng;
+    // third person: walk where you're going, turn to what you're looking at when you stop
+    if (LC.R.is3D) target = ml > 0.2 && !p.grab && !p.flash && !(p.stare && p.stare.t > 0.4) ? Math.atan2(my, mx) : aimAng;
     p.face += U.angDiff(p.face, target) * Math.min(1, dt * 14);
     p.back = Math.sin(p.face) < -0.45;
     // pose
@@ -441,23 +446,24 @@
     p.act = null;
     if (p.grab) p.pose = sp > 18 ? 'walk' : 'hold';
     else if (p.carry) p.pose = p.carry.kind === 'plant' || p.carry.kind === 'crocodile' || p.carry.kind === 'weird' ? 'carryUp' : 'carry';
-    p.heldTool = p.grab || p.carry ? null : p.tool;
-    // tools
+    // context actions: E talks/helps/uses, CLICK grabs/picks up, holding CLICK cleans
+    p.heldTool = null;
     if (!G.dialog && !LC.CCTV.isOpen()) {
-      useTool(p, input.lmb, input.lmbPressed);
-      if ((p.tool === 'mop' || p.tool === 'broom') && input.lmb && !p.carry && !p.grab) p.pose = p.tool;
-      if (input.ePressed) {
-        const it = interactable(p);
-        const t = Pl.target();
-        if (p.grab) LC.Dialogue.open(p.grab.npc);
-        else if (t && t.kind === 'npc') LC.Dialogue.open(t.n);
-        else if (it) it.fn();
-        else if (LC.Door.playerOnDuty() && G.queue[0]) LC.Dialogue.open(G.queue[0]);
-      }
-      if (input.spacePressed) {
-        if (p.grab) LC.Eject.peelOrThrow(p);
-        else shove(p);
-      }
+      const ctx = Pl.context(p);
+      p.ctx = ctx;
+      if (ctx.clean && input.lmb && !p.grab && !p.carry) {
+        const tool = ctx.clean.def.tool;
+        p.tool = tool; p.heldTool = tool; p.pose = tool;
+        const r = Wd.clean(tool, ctx.clean.x, ctx.clean.y, 26 + ctx.clean.r * 0.3, tool === 'mop' ? 1.2 : 1.6, G.dt);
+        if (r && Math.random() < G.dt * 3) LC.sfx(tool === 'mop' ? 'mop' : 'sweep', ctx.clean.x, ctx.clean.y, { vol: 0.5 });
+        if (r && r.done) { if (LC.Incidents) LC.Incidents.messCleaned(r.m); if (LC.Aura) LC.Aura.add(r.m.kind === 'vomit' ? 25 : 8, r.m.kind === 'vomit' ? 'Mopped vomit. Humble.' : null); if (r.m.kind === 'vomit') Pl.mutter(['Lovely.', 'Living the dream.', 'This is fine.'], 0.5); }
+      } else { p.cleaning = 0; p.tool = 'hands'; }
+      const run = (key) => { const a = ctx.acts.find((q) => q.key === key); if (a && a.fn) a.fn(); };
+      if (input.lmbPressed && !ctx.clean) run('CLICK');
+      if (input.ePressed) run('E');
+      if (input.xPressed) run('X');
+      if (input.bPressed) run('B');
+      if (input.spacePressed) { if (p.grab) LC.Eject.peelOrThrow(p); else shove(p); }
     }
     // prompt text
     p.prompt = prompt(p);
@@ -475,6 +481,139 @@
     p.beat = G.music.beatPhase || 0;
   };
   Pl.flashExpr = (e, t = 1.5) => { const p = LC.G.player; p.exprTemp = e; p.exprT = t; };
+
+  /* ---------------- context: what each key does right now ---------------- */
+  const MESS_NAME = { spill: 'Spilled drink', water: 'Puddle', vomit: 'Vomit', glass: 'Broken glass', trash: 'Rubbish', food: 'Dropped kebab', powder: 'Suspicious powder', dirt: 'Dirt', confetti: 'Confetti', debris: 'Bits of furniture' };
+  const PROP_NAME = { stool: 'Bar stool', chair: 'Chair', table: 'Table', plant: 'The plant', cone: 'Traffic cone', sign: 'Wet floor sign', extinguisher: 'Fire extinguisher', beanbag: 'Beanbag', crocodile: 'Inflatable crocodile', balloon: 'Balloon', weird: 'Something weird' };
+  const slippery = (m) => m && (m.kind === 'spill' || m.kind === 'vomit' || m.kind === 'water' || m.kind === 'wet');
+  function messTarget(p) {
+    const a = p.aim, close = U.dist(p.x, p.y, a.x, a.y) < REACH + 30;
+    const ax = close ? a.x : p.x + Math.cos(p.face) * 26, ay = close ? a.y : p.y + Math.sin(p.face) * 26;
+    let best = null, bd = 1e9;
+    for (const m of Wd.messNear(ax, ay, 30, (q) => !!q.def.tool)) {
+      const d = U.dist(ax, ay, m.x, m.y);
+      if (d < bd && U.dist(p.x, p.y, m.x, m.y) < REACH + m.r + 16) { bd = d; best = m; }
+    }
+    return best;
+  }
+  function wetNear(p) {
+    for (const m of Wd.messNear(p.x, p.y, 60, slippery)) if (!Wd.signNear(m.x, m.y, 72)) return m;
+    return null;
+  }
+  const hurt = (n) => n.injured > 0 || n.needsAid || (n.overrideName === 'fallen' && !n.asleep);
+  Pl.useAid = (n) => {
+    const p = LC.G.player;
+    if (p.inv.aid <= 0) { Pl.say('First aid kit is empty. Supply shelf, backstage.'); return; }
+    p.inv.aid--;
+    n.injured = 0; n.needsAid = false; n.daze = 0;
+    N.endOverride(n);
+    N.say(n, U.pick(['Thanks. I think.', 'Am I dead?', 'You smell like mop.', "I'm FINE. Thank you. I'm fine."]), { pri: 2 });
+    LC.stat('peopleRescued');
+    if (LC.Aura) LC.Aura.add(60, 'Patched someone up');
+    if (LC.Incidents) LC.Incidents.aided(n);
+  };
+  Pl.useWater = (n) => {
+    const p = LC.G.player;
+    if (p.inv.water <= 0) { Pl.say('Out of water. Supply shelf, backstage.'); return false; }
+    p.inv.water--; Pl.giveWater(n);
+    if (LC.Aura) LC.Aura.add(15, null);
+    return true;
+  };
+  Pl.useBreath = (n) => { LC.HUD.breathCard(n); LC.stat('breathTests'); LC.sfx('beep', n.x, n.y); };
+  Pl.placeSign = (x, y) => {
+    const p = LC.G.player;
+    if (p.inv.sign <= 0) { Pl.say('Out of signs. Supply shelf, backstage.'); return; }
+    const sx = U.lerp(p.x, x, 0.6), sy = U.lerp(p.y, y, 0.6);
+    Wd.addProp('sign', sx, sy);
+    p.inv.sign--;
+    LC.stat('signsPlaced');
+    LC.sfx('sign', sx, sy);
+    if (LC.Aura) LC.Aura.add(10, 'Wet floor sign. Respect.');
+    if (LC.Incidents) LC.Incidents.signPlaced(sx, sy);
+  };
+  Pl.zipTie = (n) => {
+    const p = LC.G.player;
+    if (p.inv.zip <= 0 || n.restrained) return;
+    const violent = n.overrideName === 'fight' || (p.grab && p.grab.type === 'fighter') || n.flags.violent;
+    p.inv.zip--; n.restrained = true; LC.stat('zipTies'); LC.sfx('zip', n.x, n.y);
+    if (!violent) { LC.stat('securityComplaints'); Pl.say('...was that necessary?'); N.say(n, 'ZIP TIES?! I was DANCING!', { pri: 2 }); if (LC.Aura) LC.Aura.add(-60, 'Zip-tied a dancer'); }
+    if (n.overrideName === 'fight' && LC.Social) LC.Social.removeFighter(n);
+    if (!p.grab) Pl.grabNPC(n);
+  };
+  Pl.toggleRope = () => {
+    const p = LC.G.player;
+    const b = Wd.barriers.find((q) => U.dist(p.x, p.y, q.cx, q.cy) < REACH + 30);
+    if (b) { Wd.removeBarrier(b); p.inv.rope++; return; }
+    if (p.inv.rope <= 0) { Pl.say('No rope left.'); return; }
+    const cx = p.x + Math.cos(p.face) * 40, cy = p.y + Math.sin(p.face) * 40, ang = p.face + Math.PI / 2;
+    Wd.addBarrier(cx - Math.cos(ang) * 36, cy - Math.sin(ang) * 36, cx + Math.cos(ang) * 36, cy + Math.sin(ang) * 36);
+    p.inv.rope--; LC.stat('ropesPlaced');
+  };
+  Pl.context = (p) => {
+    const G = LC.G, acts = [];
+    let title = '', sub = '', clean = null, tone = '';
+    const add = (key, label, fn) => acts.push({ key, label, fn });
+    if (p.grab) {
+      const g = p.grab, n = g.npc;
+      title = n.name; sub = g.anchor ? 'holding on to the furniture' : LC.Eject.nearExit(n) ? 'at the door' : 'walk them to an exit';
+      if (g.anchor) add('SPACE', 'Peel their fingers off (tap fast)', null);
+      else if (LC.Eject.nearExit(n)) add('SPACE', 'Throw them out', null);
+      add('E', 'Talk', () => LC.Dialogue.open(n));
+      add('CLICK', 'Let go', () => Pl.release());
+      if (p.inv.zip > 0 && !n.restrained) add('X', 'Zip-tie (' + p.inv.zip + ')', () => Pl.zipTie(n));
+      return { title, sub, acts, tone: 'grab' };
+    }
+    const it = interactable(p);
+    if (p.carry) {
+      title = PROP_NAME[p.carry.kind] || 'Something';
+      if (it) add('E', it.label, it.fn);
+      add('CLICK', 'Put it down', () => Pl.dropCarry());
+      return { title, sub: 'carrying', acts };
+    }
+    const t = Pl.target();
+    if (t && t.kind === 'npc') {
+      const n = t.n;
+      title = n.name;
+      if (n.kind === 'staff') { sub = n.role; add('E', 'Chat', () => LC.Dialogue.open(n)); if (LC.Staff.order) add('Q', 'Give them an order', null); return { title, sub, acts, tone: 'staff' }; }
+      if (n.police) { sub = 'police'; add('E', 'Say hello', () => LC.Dialogue.open(n)); return { title, sub, acts }; }
+      sub = LC.Dialogue.describe(n);
+      const inc = LC.Incidents && LC.Incidents.of(n);
+      tone = inc && (inc.noticed || inc.reported) ? 'trouble' : '';
+      if (hurt(n)) add('E', 'Patch them up (first aid ' + p.inv.aid + ')', () => Pl.useAid(n));
+      else add('E', n.asleep ? 'Wake them up' : n.state === 'queue' ? 'Check ID' : 'Talk', () => LC.Dialogue.open(n));
+      if (!(n.z > 20) && n.state !== 'queue') add('CLICK', tone ? 'Grab & walk them out' : 'Grab', () => Pl.grabNPC(n));
+      const f = LC.Social.fightOf(n);
+      add('SPACE', f ? 'Shove them apart' : 'Shove', null);
+      if (inc && inc.def.stare && !p.grab) add('LOOK', 'Keep looking to stare them down', null);
+      if (tone) add('Q', 'Radio a bouncer to throw them out', null);
+      return { title, sub, acts, tone };
+    }
+    if (t && t.kind === 'prop') {
+      const pr = t.p;
+      title = PROP_NAME[pr.kind] || 'Something';
+      if (pr.fallen) add('CLICK', 'Stand it up', () => Pl.pickProp(pr));
+      else if (pr.kind === 'sign') add('CLICK', 'Take the sign back', () => { Wd.removeProp(pr); p.inv.sign++; LC.sfx('click', p.x, p.y); });
+      else if (pr.kind !== 'table' && pr.kind !== 'beanbag') add('CLICK', 'Pick it up', () => Pl.pickProp(pr));
+      if (it) add('E', it.label, it.fn);
+      if (acts.length) return { title, sub: pr.fallen ? 'knocked over' : '', acts };
+    }
+    if (t && t.kind === 'item') { title = t.it.label; add('CLICK', 'Pick it up', () => Pl.pocketItem(t.it)); return { title, sub: 'lost property', acts }; }
+    const m = messTarget(p);
+    if (m) {
+      clean = m;
+      title = MESS_NAME[m.kind] || 'Mess';
+      sub = slippery(m) ? 'slippery' : m.kind === 'glass' ? 'sharp' : '';
+      add('HOLD', m.def.tool === 'mop' ? 'Mop it up' : 'Sweep it up', null);
+      add('Q', 'Radio Dolores to clean it', null);
+    }
+    if (it) add('E', it.label, it.fn);
+    else {
+      const w = slippery(m) ? (Wd.signNear(m.x, m.y, 72) ? null : m) : wetNear(p);
+      if (w && p.inv.sign > 0) add('E', 'Put down a wet floor sign (' + p.inv.sign + ')', () => Pl.placeSign(w.x, w.y));
+      else if (LC.Door.playerOnDuty() && G.queue[0]) add('E', 'Check the next ID', () => LC.Dialogue.open(G.queue[0]));
+    }
+    return { title, sub, acts, clean };
+  };
 
   function prompt(p) {
     const G = LC.G;

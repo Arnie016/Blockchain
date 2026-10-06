@@ -5,7 +5,8 @@
   'use strict';
   const { U, Map: M, People: Pp } = LC;
   const T = M.T;
-  const R = (LC.R = { zoomMul: 1 });
+  const R = (LC.R2D = { zoomMul: 1, is3D: false });
+  LC.R = R;
   let canvas, ctx, dpr = 1;
   const lightCv = document.createElement('canvas');
   const lg = lightCv.getContext('2d');
@@ -726,16 +727,20 @@
 
   /* ================= bubbles, emotes (screen space) ================= */
   const BUB_FONT = '600 13px "Barlow Semi Condensed", "Arial Narrow", sans-serif';
-  function drawBubbles(g, G) {
+  function drawBubbles(g, G, P) {
+    P = P || R;
     const list = [];
     for (const c of G.chars) {
       if (!c.bubble && !c.emote) continue;
-      const s = R.toScreen(c.x, c.y, (c.z || 0) + 50 * ((c.look && c.look.height) || 1) + (c.pose === 'lie' || c.pose === 'fallen' ? -30 : 0));
-      if (s.x < -80 || s.x > R.cw + 80 || s.y < -60 || s.y > R.ch + 60) continue;
+      if (P.is3D && c.hidden) continue;
+      const s = P.toScreen(c.x, c.y, (c.z || 0) + 50 * ((c.look && c.look.height) || 1) + (c.pose === 'lie' || c.pose === 'fallen' ? -30 : 0));
+      if (s.behind || s.x < -80 || s.x > P.cw + 80 || s.y < -60 || s.y > P.ch + 60) continue;
+      // in 3D, far-away chatter is dropped unless it matters
+      if (P.is3D && c.bubble && !c.bubble.pri && !c.emote) { const p = G.player; if (p && U.dist(p.x, p.y, c.x, c.y) > 520) continue; }
       list.push({ c, s });
     }
     g.save();
-    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    g.setTransform(P.dpr || dpr, 0, 0, P.dpr || dpr, 0, 0);
     g.font = BUB_FONT;
     g.textBaseline = 'middle';
     g.textAlign = 'left';
@@ -753,13 +758,13 @@
       const lh = 16, pad = 7;
       let w = 0; for (const l of lines) w = Math.max(w, g.measureText(l).width);
       w += pad * 2; const h = lines.length * lh + pad;
-      let bx = U.clamp(s.x - w / 2, 6, R.cw - w - 6), by = s.y - h - (c.emote ? 30 : 12);
+      let bx = U.clamp(s.x - w / 2, 6, P.cw - w - 6), by = s.y - h - (c.emote ? 30 : 12);
       for (let k = 0; k < 6; k++) {
         const hit = boxes.find((o) => bx < o.x + o.w && bx + w > o.x && by < o.y + o.h && by + h > o.y);
         if (!hit) break;
         by = hit.y - h - 4;
       }
-      by = U.clamp(by, 6, R.ch - h - 6);
+      by = U.clamp(by, 6, P.ch - h - 6);
       boxes.push({ x: bx, y: by, w, h });
       const age = G.t - b.t0, fade = Math.min(1, age * 8, (b.dur - age) * 3);
       if (fade <= 0) continue;

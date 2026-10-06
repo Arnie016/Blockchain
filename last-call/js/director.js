@@ -10,15 +10,15 @@
 
   /* ================= nights ================= */
   Dr.NIGHTS = [
-    { day: 'Thursday', tag: 'Student Night', crowd: 0.72, chaos: 0.72, events: 2, pool: ['birthday', 'influencer', 'crocodile', 'shots40'] },
-    { day: 'Friday', tag: 'After-Work Drinks', crowd: 0.9, chaos: 0.9, events: 3, pool: ['wedding', 'lostPhone', 'influencer', 'proposal', 'powerOut', 'shots40', 'ex'] },
-    { day: 'Saturday', tag: 'Peak Weekend', crowd: 1.08, chaos: 1.05, events: 4, pool: ['birthday', 'football', 'bachelor', 'celebrity', 'fireAlarm', 'crocodile', 'lostPhone', 'ex'] },
+    { day: 'Thursday', tag: 'Student Night', crowd: 0.72, chaos: 0.72, events: 2, pool: ['birthday', 'influencer', 'crocodile', 'shots40', 'teens'] },
+    { day: 'Friday', tag: 'After-Work Drinks', crowd: 0.9, chaos: 0.9, events: 3, pool: ['wedding', 'lostPhone', 'influencer', 'proposal', 'powerOut', 'shots40', 'ex', 'gang', 'teens'] },
+    { day: 'Saturday', tag: 'Peak Weekend', crowd: 1.08, chaos: 1.05, events: 4, pool: ['birthday', 'football', 'bachelor', 'celebrity', 'fireAlarm', 'crocodile', 'lostPhone', 'ex', 'gang', 'gang'] },
     { day: 'Sunday', tag: 'Bank Holiday Special', crowd: 1.02, chaos: 1.2, events: 4, pool: ['football', 'wedding', 'powerOut', 'celebrity', 'proposal', 'influencer', 'crocodile', 'fireAlarm', 'shots40'] },
   ];
   Dr.night = (i) => {
     if (i < Dr.NIGHTS.length) return Dr.NIGHTS[i];
     const days = ['Thursday', 'Friday', 'Saturday', 'Sunday', 'Wednesday'];
-    return { day: days[i % days.length], tag: U.pick(['Foam Party (Cancelled)', 'Throwback Night', 'Silent Disco (Not Silent)', 'Industry Night', 'Mystery Theme']), crowd: 1.05, chaos: 1.1 + Math.min(0.4, (i - 4) * 0.05), events: 5, pool: ['birthday', 'football', 'bachelor', 'celebrity', 'fireAlarm', 'crocodile', 'lostPhone', 'ex', 'wedding', 'powerOut', 'proposal', 'influencer', 'shots40'] };
+    return { day: days[i % days.length], tag: U.pick(['Foam Party (Cancelled)', 'Throwback Night', 'Silent Disco (Not Silent)', 'Industry Night', 'Mystery Theme']), crowd: 1.05, chaos: 1.1 + Math.min(0.4, (i - 4) * 0.05), events: 5, pool: ['birthday', 'football', 'bachelor', 'celebrity', 'fireAlarm', 'crocodile', 'lostPhone', 'ex', 'wedding', 'powerOut', 'proposal', 'influencer', 'shots40', 'gang', 'teens'] };
   };
 
   // minutes since 9 PM: how fast time moves (seconds per game minute), how much trouble is allowed, how full it gets
@@ -49,7 +49,7 @@
   const WHO = {
     marcus: { tag: 'HEAD SECURITY', c: '#ffd23f', pitch: 0.8 }, jolene: { tag: 'BAR', c: '#ff9ad0', pitch: 1.3 }, krank: { tag: 'DJ', c: '#7fe0ff', pitch: 0.9 },
     petrakis: { tag: 'MANAGER', c: '#c9a2ff', pitch: 0.95 }, ines: { tag: 'COAT CHECK', c: '#ffcf7a', pitch: 1.25 }, bogdan: { tag: 'KITCHEN', c: '#b8f08a', pitch: 0.7 },
-    rico: { tag: 'VIP', c: '#ffe08a', pitch: 1.0 }, tank: { tag: 'SECURITY', c: '#ffd23f', pitch: 0.65 }, priya: { tag: 'SECURITY', c: '#ffd23f', pitch: 1.2 }, you: { tag: 'YOU', c: '#ffffff', pitch: 0.9 },
+    dolores: { tag: 'CLEANER', c: '#7fe0d0', pitch: 1.1 }, rico: { tag: 'VIP', c: '#ffe08a', pitch: 1.0 }, tank: { tag: 'SECURITY', c: '#ffd23f', pitch: 0.65 }, priya: { tag: 'SECURITY', c: '#ffd23f', pitch: 1.2 }, you: { tag: 'YOU', c: '#ffffff', pitch: 0.9 },
   };
   R.WHO = WHO;
   R.say = (who, text) => R.queue.push({ who, text, delay: 0 });
@@ -258,8 +258,8 @@
     const a = Math.atan2(y - p.y, x - p.x), cues = LC.HUD.cues;
     // the same racket from the same direction is one cue, not a pile of them
     const same = cues.find((c) => c.text === word && Math.abs(U.angDiff(c.a, a)) < 0.6);
-    if (same) { same.t = Math.min(same.t, 0.25); same.a = a; }
-    else { cues.push({ text: word, a, t: 0 }); if (cues.length > 4) cues.shift(); }
+    if (same) { same.t = Math.min(same.t, 0.25); same.a = a; same.x = x; same.y = y; }
+    else { cues.push({ text: word, a, t: 0, x, y }); if (cues.length > 4) cues.shift(); }
     if (kind === 'crash' && G.t - (Dr.lastGreat || -99) > 25) {
       Dr.lastGreat = G.t;
       setTimeout(() => { LC.Player.say('...great.'); LC.Objectives.flash('...great.', 'Something broke. Somewhere behind you.'); }, 700);

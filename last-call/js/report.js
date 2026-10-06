@@ -79,7 +79,7 @@
     ['People found sleeping', 'peopleFoundSleeping'], ['Stolen objects recovered', 'stolenRecovered'], ['Stolen objects lost', 'stolenLost'], ['Bathrooms survived', 'bathroomVisits'],
     ['Club damage', 'clubDamage', (v) => '£' + v.toLocaleString()], ['Customer complaints', 'customerComplaints'], ['Security complaints', 'securityComplaints'], ['Police visits', 'policeVisits'],
     ['Random objects discovered', 'randomObjects'], ['Vomit mopped', 'vomitCleaned'], ['Wet floor signs deployed', 'signsPlaced'], ['Stare-downs won', 'staresWon'],
-    ['Sarcastic remarks', 'sarcasticRemarks'], ['Conga participants', 'congaJoiners'], ['IDs checked by you', 'idsChecked'], ['Problems you never saw', 'incidentsMissed'],
+    ['Aura gained', 'auraGained'], ['Aura lost', 'auraLost'], ['Sarcastic remarks', 'sarcasticRemarks'], ['Conga participants', 'congaJoiners'], ['IDs checked by you', 'idsChecked'], ['Problems you never saw', 'incidentsMissed'],
   ];
 
   Rp.show = (G, regNotes) => {

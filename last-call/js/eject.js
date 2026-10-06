@@ -48,7 +48,7 @@
     const wasAsleep = n.asleep;
     if (n.asleep && LC.Director) LC.Director.wake(n, true);
     const type = wasAsleep ? 'limp' : n.restrained ? 'peaceful' : Ej.chooseType(n);
-    const innocent = !n.incident && !n.flags.warned && !n.flags.banned && !n.flags.noWristband && n.overrideName !== 'fight' && n.overrideName !== 'argue' && !wasAsleep && n.state === 'inside';
+    const innocent = !n.incident && !n.flags.warned && !n.flags.banned && !n.flags.noWristband && !n.flags.tutorialTarget && !n.flags.underage && (1 - n.sob) < 0.8 && n.overrideName !== 'fight' && n.overrideName !== 'argue' && !wasAsleep && n.state === 'inside';
     const g = { npc: n, type, t: 0, hold: 1, anchor: null, grip: 0, anchorT: U.rand(1, 2.2), innocent, talked: false, lineT: 1.2, swingT: U.rand(2, 3.5), burstT: U.rand(1.5, 3), burst: 0 };
     p.grab = g;
     n.escorted = true;
@@ -373,7 +373,8 @@
     const type = o.type || 'argue';
     LC.stat('ejected');
     LC.stat(by === 'player' ? 'ejectedByYou' : by === 'police' ? 'ejectedByPolice' : 'ejectedByStaff');
-    if (o.innocent) LC.stat('innocentEjected');
+    if (n) n.flags.ejected = true;
+    if (o.innocent) (LC.Aura && LC.Aura.add(-150, 'Threw out an innocent person')), LC.stat('innocentEjected');
     n.state = 'ejected';
     n.perm = P.OUT;
     n.flags.banned = true;

@@ -8,7 +8,7 @@
   const $ = (id) => document.getElementById(id);
   const STEP = 1 / 60;
 
-  const settings = Object.assign({ shift: 1, muted: false, zoom: 1, look: 0 }, U.load('lastcall.settings.v1', {}));
+  const settings = Object.assign({ shift: 1, muted: false, zoom: 1, look: 0, view: '3d' }, U.load('lastcall.settings.v1', {}));
   const saveSettings = () => U.save('lastcall.settings.v1', settings);
   Game.settings = settings;
   let state = 'title';
@@ -26,15 +26,15 @@
     if (state !== 'play') { if (state === 'pause' && (k === 'Escape' || k === 'KeyP')) resume(); return; }
     const G = LC.G;
     if (G.dialog && /^Digit[1-4]$/.test(k)) { LC.Dialogue.pick(+k.slice(5) - 1); In.pressed.delete(k); return; }
-    if (/^Digit[1-9]$/.test(k)) { LC.Player.setTool(LC.Player.TOOLS[+k.slice(5) - 1].id); return; }
     switch (k) {
       case 'Tab': LC.CCTV.toggle(); break;
       case 'Escape': if (G.dialog) LC.Dialogue.close(); else if (LC.CCTV.isOpen()) LC.CCTV.close(); else pause(); break;
       case 'KeyP': pause(); break;
       case 'KeyF': G.player.flash = !G.player.flash; LC.sfx('click', 0, 0, { ui: true }); break;
       case 'KeyQ': callBackup(); break;
-      case 'KeyZ': settings.zoom = settings.zoom === 1 ? 0.72 : 1; saveSettings(); break;
+      case 'KeyZ': if (LC.R.is3D) LC.R.cycleZoom(); else { settings.zoom = settings.zoom === 1 ? 0.72 : 1; saveSettings(); } break;
       case 'KeyM': toggleMute(); break;
+      case 'KeyH': { const h = $('helpCard'); h.hidden = !h.hidden; break; }
     }
     if (LC.CCTV.isOpen()) {
       if (k === 'ArrowRight' || k === 'KeyD') document.getElementById('camNext').click();
@@ -45,17 +45,35 @@
   addEventListener('keyup', (e) => In.keys.delete(e.code));
   addEventListener('blur', () => { In.keys.clear(); In.lmb = false; });
   const canvas = $('game');
-  canvas.addEventListener('mousemove', (e) => { In.mx = e.clientX; In.my = e.clientY; In.touch = false; In.aimed = true; });
+  // 3D: click locks the mouse for GTA-style looking; if the browser refuses, right-drag looks
+  const locked = () => document.pointerLockElement === canvas;
+  In.locked = locked;
+  let dragLook = null;
+  function tryLock() {
+    if (!LC.R.is3D || locked() || In.touchDevice) return false;
+    try { const r = canvas.requestPointerLock(); if (r && r.catch) r.catch(() => { In.noLock = true; }); } catch (e) { In.noLock = true; }
+    return true;
+  }
+  Game.unlock = () => { if (locked() && document.exitPointerLock) document.exitPointerLock(); };
+  document.addEventListener('pointerlockerror', () => { In.noLock = true; });
+  canvas.addEventListener('mousemove', (e) => {
+    if (LC.R.is3D && locked()) { LC.R.look(e.movementX || 0, e.movementY || 0); In.mx = LC.R.cw / 2; In.my = LC.R.ch * 0.46; In.aimed = true; In.touch = false; return; }
+    if (dragLook) { LC.R.look((e.clientX - dragLook.x) * 1.4, (e.clientY - dragLook.y) * 1.4); dragLook.x = e.clientX; dragLook.y = e.clientY; }
+    In.mx = e.clientX; In.my = e.clientY; In.touch = false; In.aimed = true;
+  });
   canvas.addEventListener('mousedown', (e) => {
+    LC.Audio.resume();
+    if (LC.R.is3D && state === 'play' && !locked() && !In.noLock && e.button === 0 && !(LC.G && LC.G.dialog) && !LC.CCTV.isOpen()) { if (tryLock()) return; }
+    if (LC.R.is3D && e.button === 2 && !locked()) { dragLook = { x: e.clientX, y: e.clientY }; return; }
     if (e.button === 0) { In.lmb = true; In.lmbPressed = true; }
     if (e.button === 2) In.pressed.add('Space');
-    LC.Audio.resume();
   });
-  addEventListener('mouseup', (e) => { if (e.button === 0) In.lmb = false; });
+  addEventListener('mouseup', (e) => { if (e.button === 0) In.lmb = false; if (e.button === 2) dragLook = null; });
   canvas.addEventListener('contextmenu', (e) => e.preventDefault());
   let wheelT = 0;
   canvas.addEventListener('wheel', (e) => {
     e.preventDefault();
+    if (LC.R.is3D) { LC.R.zoomBy(e.deltaY); return; }
     if (state !== 'play' || performance.now() - wheelT < 90) return;
     wheelT = performance.now();
     LC.Player.cycleTool(e.deltaY > 0 ? 1 : -1);
@@ -75,6 +93,10 @@
           touch.joyId = t.identifier; touch.ox = t.clientX; touch.oy = t.clientY;
           base.style.left = t.clientX + 'px'; base.style.top = t.clientY + 'px'; base.hidden = false;
           knob.style.transform = 'translate(-50%,-50%)';
+        } else if (touch.aimId === null && LC.R.is3D) {
+          // 3D: drag on the right to look around, tap to look at something
+          touch.aimId = t.identifier; touch.lkx = t.clientX; touch.lky = t.clientY; touch.moved = 0;
+          In.mx = t.clientX; In.my = t.clientY; In.aimed = true; In.touch = true;
         } else if (touch.aimId === null) {
           touch.aimId = t.identifier;
           In.mx = t.clientX; In.my = t.clientY; In.aimed = true; In.touch = true;
@@ -96,7 +118,10 @@
           if (d > max) { dx *= max / d; dy *= max / d; }
           In.joy.x = dx / max; In.joy.y = dy / max; In.joy.on = true;
           knob.style.transform = 'translate(calc(-50% + ' + dx + 'px), calc(-50% + ' + dy + 'px))';
-        } else if (t.identifier === touch.aimId) { In.mx = t.clientX; In.my = t.clientY; }
+        } else if (t.identifier === touch.aimId) {
+          if (LC.R.is3D) { const dx = t.clientX - touch.lkx, dy = t.clientY - touch.lky; touch.moved += Math.abs(dx) + Math.abs(dy); LC.R.look(dx * 2.2, dy * 2.2); touch.lkx = t.clientX; touch.lky = t.clientY; if (touch.moved > 12) { In.mx = LC.R.cw / 2; In.my = LC.R.ch * 0.46; } }
+          else { In.mx = t.clientX; In.my = t.clientY; }
+        }
       }
       e.preventDefault();
     }, { passive: false });
@@ -111,6 +136,12 @@
     const bind = (id, fn) => { const b = $(id); b.addEventListener('touchstart', (e) => { e.preventDefault(); e.stopPropagation(); LC.Audio.resume(); fn(); }, { passive: false }); b.addEventListener('click', fn); };
     bind('tTalk', () => In.pressed.add('KeyE'));
     bind('tShove', () => In.pressed.add('Space'));
+    const use = $('tUse');
+    use.addEventListener('touchstart', (e) => { e.preventDefault(); e.stopPropagation(); In.lmb = true; In.lmbPressed = true; }, { passive: false });
+    use.addEventListener('touchend', () => { In.lmb = false; });
+    const vis = $('tVis');
+    vis.addEventListener('touchstart', (e) => { e.preventDefault(); e.stopPropagation(); In.vision = true; }, { passive: false });
+    vis.addEventListener('touchend', () => { In.vision = false; });
     bind('tFlash', () => { if (LC.G && LC.G.player) LC.G.player.flash = !LC.G.player.flash; });
     bind('tRadio', () => callBackup());
     bind('tCam', () => LC.CCTV.toggle());
@@ -124,10 +155,12 @@
     let dy = (k.has('KeyS') || k.has('ArrowDown') ? 1 : 0) - (k.has('KeyW') || k.has('ArrowUp') ? 1 : 0);
     if (In.joy.on) { dx = In.joy.x; dy = In.joy.y; }
     if (LC.CCTV.isOpen()) { dx = 0; dy = 0; }
+    if (LC.R.is3D && (dx || dy)) { const b = LC.R.moveBasis(dx, dy); dx = b.dx; dy = b.dy; }
+    if (LC.R.is3D && locked()) { In.mx = LC.R.cw / 2; In.my = LC.R.ch * 0.46; }
     return {
       dx, dy, sprint: k.has('ShiftLeft') || k.has('ShiftRight') || (In.joy.on && Math.hypot(In.joy.x, In.joy.y) > 0.96),
       mx: In.mx, my: In.my, lmb: In.lmb && !LC.CCTV.isOpen(), lmbPressed: In.lmbPressed && !LC.CCTV.isOpen(),
-      ePressed: In.pressed.has('KeyE'), spacePressed: In.pressed.has('Space'), touch: In.touch, aimed: In.aimed,
+      ePressed: In.pressed.has('KeyE'), spacePressed: In.pressed.has('Space'), xPressed: In.pressed.has('KeyX'), bPressed: In.pressed.has('KeyB'), touch: In.touch, aimed: In.aimed,
     };
   }
 
@@ -159,7 +192,7 @@
       chars: [], npcs: [], groups: [], queue: [], args: [], fights: [], police: [], events: [], history: [],
       dynLights: [], music: { energy: 0.3, beatPhase: 0, beatTime: 0, pattern: 0, palette: nightIndex % 6, drop: 0, laser: 0, stopped: false, hijacked: false, special: null },
       power: true, lightsOn: 0, alarm: false, barOpen: true, kebabOpen: false, vipRopeOpen: 0, closing: false, ending: false, emergencyOpen: false,
-      functioning: 100, stats: {}, dialog: null, player: null, phaseName: '',
+      functioning: 100, stats: {}, dialog: null, player: null, phaseName: '', aura: 0,
     });
     resetWorld();
     LC.Staff.spawn();
@@ -247,6 +280,7 @@
 
   /* ================= camera ================= */
   function camera(dt) {
+    if (LC.R.is3D) { LC.R.updateCamera(dt, LC.G); return; }
     const G = LC.G, c = LC.R.cam, p = G.player;
     let tx, ty;
     if (G.demo) {
@@ -283,7 +317,16 @@
     const G = LC.G, p = G.player;
     if (state !== 'play') return;
     if (G.t - lastBackup < 15) { LC.Player.say(U.pick(['Backup is still coming. Allegedly.', 'They heard me the first time.'])); return; }
-    let target = p.grab ? p.grab.npc : null, kind = 'assist';
+    // pointing at a mess? that's a job for Dolores
+    const ctx = p.ctx;
+    if (!p.grab && ctx && ctx.clean) {
+      const r = LC.Staff.orderClean(ctx.clean);
+      const what = ctx.title.toLowerCase();
+      if (r === true) { LC.Radio.convo([['you', 'Dolores, ' + what + ', ' + (p.room ? p.room.name.toLowerCase() : 'here') + '.'], ['dolores', U.pick(['On my way. Slowly.', 'Of course there is.', 'I am sixty-three.'])]]); lastBackup = G.t - 10; if (LC.Aura) LC.Aura.add(15, 'Delegated'); }
+      else LC.Radio.convo([['you', 'Dolores?'], ['dolores', 'I am mopping something ELSE.']]);
+      return;
+    }
+    let target = p.grab ? p.grab.npc : (p.aimWho && p.aimWho.kind === 'guest' && U.dist(p.x, p.y, p.aimWho.x, p.aimWho.y) < 500 ? p.aimWho : null), kind = target && !p.grab ? 'eject' : 'assist';
     if (!target) {
       const f = LC.Social.fightNear(p.x, p.y, 380);
       if (f) { target = [...f.members.keys()][0]; kind = 'fight'; }
@@ -312,6 +355,7 @@
   }
   function pause() {
     if (state !== 'play') return;
+    Game.unlock();
     state = 'pause';
     $('pause').hidden = false;
     LC.Dialogue.close();
@@ -344,6 +388,7 @@
     state = 'play';
     $('nightLabel').textContent = 'NIGHT ' + (nightIndex + 1) + ' · ' + LC.G.night.day.toUpperCase() + ' · ' + LC.G.night.tag.toUpperCase();
     LC.HUD.phaseBanner('DOORS OPEN', '9:00 PM · ' + LC.G.night.day);
+    if (nightIndex === 0) LC.G.tut = { i: 0, s: null, done: false };
   };
   let touchReady = false;
   function setupTouchOnce() { if (!touchReady) { touchReady = true; setupTouch(); } }
@@ -422,7 +467,7 @@
       while (acc >= STEP && steps < max) {
         step(STEP, input);
         acc -= STEP; steps++;
-        if (steps === 1) { input.ePressed = false; input.spacePressed = false; input.lmbPressed = false; }
+        if (steps === 1) { input.ePressed = false; input.spacePressed = false; input.lmbPressed = false; input.xPressed = false; input.bPressed = false; }
       }
       if (steps >= max) acc = 0;
       In.pressed.clear(); In.lmbPressed = false;
@@ -434,12 +479,19 @@
       camera(dt);
       buildLights();
       if (!LC.CCTV.isOpen() || state !== 'play') LC.R.draw(G, hooks);
+      else if (LC.R.is3D) LC.R.draw(G, { skip: true });
     }
   }
 
   /* ================= boot ================= */
   function boot() {
-    LC.R.init(canvas);
+    // 3D unless asked otherwise or the browser can't; the 2D renderer is the fallback
+    let use3D = settings.view !== '2d' && LC.R3 && LC.R3.ok;
+    if (use3D) {
+      try { LC.R = LC.R3; LC.R3.init(canvas); } catch (e) { console.warn('3D renderer unavailable, using 2D', e); use3D = false; const gl = $('game3d'); if (gl) gl.remove(); }
+    }
+    if (!use3D) { LC.R = LC.R2D; LC.R2D.init(canvas); }
+    document.body.classList.toggle('view3d', !!use3D);
     LC.HUD.init();
     LC.CCTV.init();
     LC.Regulars.load();
@@ -469,7 +521,8 @@
     start: (i) => Game.start(i || 0),
     inc: (type) => { const d = LC.Incidents.defs[type]; const n = LC.G.npcs.find((q) => q.kind === 'guest' && q.state === 'inside' && !q.incident && (!d.cand || d.cand(q) > 0)) || LC.G.npcs.find((q) => q.kind === 'guest' && q.state === 'inside' && !q.incident); return n ? LC.Incidents.start(type, n) : null; },
     event: (type) => { const G = LC.G; G.events.push({ type, at: G.clock, done: false }); },
-    tp: (x, y) => { const p = LC.G.player; p.body.x = x * T; p.body.y = y * T; p.x = p.body.x; p.y = p.body.y; LC.R.cam.x = p.x; LC.R.cam.y = p.y; },
+    tp: (x, y) => { const p = LC.G.player; p.body.x = x * T; p.body.y = y * T; p.x = p.body.x; p.y = p.body.y; LC.R.cam.x = p.x; LC.R.cam.y = p.y; if (LC.R.rig) { const w = LC.R.toW(p.x, p.y, 0, { x: 0, y: 0, z: 0 }); LC.R.rig.fx = w.x; LC.R.rig.fz = w.z; } },
+    look: (yaw, pitch, dist) => { const r = LC.R.rig; if (!r) return; if (yaw !== undefined) r.yaw = yaw; if (pitch !== undefined) r.pitch = pitch; if (dist !== undefined) { r.dist = r.tdist = dist; } },
     state: () => state,
     step,
   };

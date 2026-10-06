@@ -102,6 +102,7 @@
     const msg = text || (typeof pool === 'function' ? pool(inc) : U.pick(pool));
     if (inc.noticed || inc.reported || how === 'eject') O.done(inc, how === 'stare' ? 'RESOLVED WITH EYE CONTACT. ' + msg : msg, true);
     if (how !== 'self' && how !== 'quiet') LC.stat('incidentsResolved');
+    if (LC.Guide) LC.Guide.onResolve(inc, how);
     LC.stat('resolvedBy_' + how);
     if (def.onResolve) def.onResolve(inc, how);
     const n = inc.n;
@@ -120,6 +121,7 @@
     if (inc.noticed || inc.reported) O.done(inc, msg, false);
     else if (def.loud) O.toast('MISSED: ' + inc.title, msg, false);
     LC.stat('incidentsFailed');
+    if (LC.Aura && (inc.noticed || inc.reported)) LC.Aura.add(-40, 'Let it happen');
     if (!inc.noticed) LC.stat('incidentsMissed');
     if (def.onFail) def.onFail(inc, how);
     const n = inc.n;

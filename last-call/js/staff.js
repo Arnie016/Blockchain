@@ -73,6 +73,7 @@
     host: { top: 'suit', topC: '#1a1a24', bot: 'pants', botC: '#121214' },
     boss: { top: 'suit', topC: '#6a5a8a', bot: 'pants', botC: '#2a2a3a', chain: true, hair: 'slick' },
     chef: { top: 'shirt', topC: '#f0f0f0', topC2: '#f0f0f0', bot: 'pants', botC: '#333' },
+    clean: { top: 'shirt', topC: '#3a7a8a', topC2: '#3a7a8a', bot: 'pants', botC: '#2a3a40', shoes: '#eee' },
     cop: { top: 'shirt', topC: '#1f2d4d', topC2: '#1f2d4d', bot: 'pants', botC: '#1a2438', hat: 'cap' },
   };
   function mk(role, name, fem, x, y, uni, extra = {}) {
@@ -114,7 +115,10 @@
     N.setTask(St.boss, tManager(St.boss), 'manager');
     St.chef = mk('chef', 'Bogdan', false, S.chef.x, S.chef.y, 'chef');
     N.setTask(St.chef, tChef(St.chef), 'chef');
-    St.all = [...St.bartenders, St.dj, St.coat, St.marcus, ...St.bouncers, St.host, St.boss, St.chef];
+    St.cleaner = mk('cleaner', 'Dolores', true, S.supply.x - 30, S.supply.y + 40, 'clean');
+    St.cleaner.look.hair = 'bun'; St.cleaner.look.hairC = '#a3a3a8';
+    N.setTask(St.cleaner, tCleaner(St.cleaner), 'clean');
+    St.all = [...St.bartenders, St.dj, St.coat, St.marcus, ...St.bouncers, St.host, St.boss, St.chef, St.cleaner];
     G.police = [];
   };
 
@@ -245,6 +249,42 @@
       yield* N.wait(n, U.rand(3, 8));
     }
   }
+
+  /* ================= the cleaner ================= */
+  // Dolores cleans what you point her at; left alone she does the worst thing she can find, slowly
+  function* tCleaner(c) {
+    const G = LC.G;
+    for (;;) {
+      let m = c.job && c.job.mess;
+      if (m && !Wd.mess.includes(m)) { c.job = null; m = null; }
+      if (!m && Math.random() < 0.2) {
+        const near = Wd.mess.filter((q) => q.def.tool && q.def.weight >= 1 && M.inClub(q.x, q.y) && U.dist(c.x, c.y, q.x, q.y) < 700);
+        near.sort((a, b) => b.def.weight * b.r - a.def.weight * a.r);
+        m = near[0] || null;
+      }
+      if (!m) { c.act = 'stand'; yield* N.wait(c, U.rand(3, 6)); continue; }
+      yield* N.go(c, m.x + 18, m.y + 10, { arrive: 22, perm: P.ALL, speed: c.job ? 120 : 80 });
+      const tool = m.def.tool;
+      let t = 0;
+      while (Wd.mess.includes(m) && t < 25) {
+        t += G.dt; c.act = tool; c.heldTool = tool; N.faceTo(c, m.x, m.y);
+        const r = Wd.clean(tool, m.x, m.y, 26 + m.r * 0.3, 0.75, G.dt);
+        if (r && r.done && LC.Incidents) LC.Incidents.messCleaned(r.m);
+        if (Math.random() < G.dt * 0.05) N.say(c, U.pick(['In my day people were sick OUTSIDE.', 'Mm-hm.', "I've seen worse. Not much worse.", 'Thirty years. Thirty.']), { pri: 1 });
+        yield;
+      }
+      c.heldTool = null; c.act = null;
+      if (c.job) { c.job = null; N.say(c, U.pick(['Done. You owe me.', 'Clean. For now.', 'Next time, YOU mop.']), { pri: 1 }); }
+    }
+  }
+  St.orderClean = (m) => {
+    const c = St.cleaner;
+    if (!c || c.gone) return false;
+    if (c.job) return 'busy';
+    c.job = { mess: m };
+    N.setTask(c, tCleaner(c), 'clean');
+    return true;
+  };
 
   /* ================= backup ================= */
   St.freeBouncer = (x, y) => {

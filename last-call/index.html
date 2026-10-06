@@ -66,14 +66,41 @@ button:focus-visible, select:focus-visible { outline: 2px solid var(--hivis); ou
 #banner .bn { font-family: var(--display); font-weight: 900; font-size: clamp(34px, 7vw, 78px); letter-spacing: 0.06em; line-height: 0.95; text-shadow: 0 0 30px rgba(255,61,154,0.6), 0 4px 0 #000; }
 @keyframes banner { 0% { opacity: 0; transform: translate(-50%, -40%); } 12%, 70% { opacity: 1; transform: translate(-50%, -50%); } 100% { opacity: 0; transform: translate(-50%, -58%); } }
 
-#radio { position: absolute; left: 14px; bottom: calc(92px + env(safe-area-inset-bottom, 0px)); width: min(440px, 40vw); margin: 0; padding: 0; list-style: none; display: grid; gap: 3px; }
+#radio { position: absolute; left: 14px; bottom: calc(230px + env(safe-area-inset-bottom, 0px)); width: min(400px, 36vw); margin: 0; padding: 0; list-style: none; display: grid; gap: 3px; }
 #radio li { background: rgba(8, 14, 10, 0.78); padding: 5px 9px; font-family: var(--mono); font-size: 13px; line-height: 1.3; color: #d9ffe3; border-left: 2px solid #3a6a48; }
 #radio li i { font-style: normal; font-size: 11px; letter-spacing: 0.06em; margin-right: 4px; }
 
 #bottom { position: absolute; left: 50%; bottom: calc(10px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); display: grid; justify-items: center; gap: 6px; width: min(96vw, 640px); }
-#prompt { font-size: 14px; font-weight: 600; letter-spacing: 0.02em; text-align: center; background: rgba(0,0,0,0.55); padding: 4px 10px; border-radius: 2px; transition: opacity 0.2s; min-height: 1em; }
-#hotbar { display: flex; gap: 4px; pointer-events: auto; }
-.slot { position: relative; width: 50px; height: 50px; padding: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 3px; cursor: pointer; display: grid; place-items: center; }
+#prompt { font-size: 15px; text-align: center; transition: opacity 0.15s; display: grid; gap: 4px; justify-items: center; }
+#prompt .pt { background: rgba(8,6,14,0.82); padding: 4px 12px; border-radius: 3px; border-left: 3px solid var(--cyan); }
+#prompt .pt.trouble { border-left-color: var(--bad); } #prompt .pt.grab { border-left-color: var(--hivis); }
+#prompt .pt b { font-family: var(--display); font-size: 18px; letter-spacing: 0.03em; margin-right: 8px; }
+#prompt .pt span { color: var(--dim); font-size: 14px; }
+#prompt .pa { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+#prompt .pa span { background: rgba(8,6,14,0.82); padding: 4px 10px 4px 4px; border-radius: 3px; font-weight: 600; }
+#prompt .pa.dim span { opacity: 0.8; }
+#prompt kbd { display: inline-block; font-family: var(--mono); font-size: 12px; background: var(--hivis); color: #1a1400; padding: 2px 6px; border-radius: 2px; margin-right: 7px; }
+#minimap { position: absolute; left: 14px; bottom: calc(14px + env(safe-area-inset-bottom, 0px)); width: 200px; height: 200px; border-radius: 50%; box-shadow: 0 0 0 3px rgba(0,0,0,0.6), 0 6px 20px rgba(0,0,0,0.5); }
+#aura { position: absolute; right: 14px; bottom: calc(96px + env(safe-area-inset-bottom, 0px)); width: 170px; padding: 6px 10px; text-align: right; }
+#aura .lbl { font-family: var(--display); font-size: 12px; letter-spacing: 0.12em; color: var(--dim); }
+#auraVal { font-family: var(--display); font-weight: 800; font-size: 26px; color: #c9a2ff; text-shadow: 0 0 12px rgba(180,120,255,0.6); }
+#aura[data-s="neg"] #auraVal { color: #ff6a6a; text-shadow: 0 0 12px rgba(255,80,80,0.5); }
+#aura[data-s="hi"] #auraVal { color: #ffe08a; text-shadow: 0 0 14px rgba(255,210,90,0.7); }
+#auraRank { font-size: 12px; color: var(--dim); }
+#auraPops { position: absolute; right: 14px; bottom: calc(176px + env(safe-area-inset-bottom, 0px)); display: grid; gap: 3px; justify-items: end; }
+#auraPops div { font-size: 14px; background: rgba(8,6,14,0.8); padding: 3px 9px; border-radius: 2px; }
+#auraPops .up b { color: #c9a2ff; } #auraPops .down b { color: #ff6a6a; }
+#jobHint { position: absolute; right: 14px; width: min(360px, 42vw); top: calc(12px + env(safe-area-inset-top, 0px)); transform: translateY(-120%); }
+#objWrap { position: absolute; right: 14px; top: calc(12px + env(safe-area-inset-top, 0px)); width: min(360px, 42vw); display: grid; gap: 6px; }
+#objWrap #obj { position: static; width: auto; }
+#objWrap #jobHint { position: static; transform: none; width: auto; background: rgba(40,30,4,0.85); border-left: 3px solid var(--hivis); padding: 6px 10px; font-size: 13.5px; line-height: 1.35; }
+#objWrap #jobHint b { color: var(--hivis); font-family: var(--display); letter-spacing: 0.05em; }
+#helpCard { position: fixed; left: 50%; top: 50%; transform: translate(-50%,-50%); width: min(560px, 92vw); padding: 18px 22px; z-index: 6; pointer-events: auto; }
+#helpCard h3 { margin: 0 0 8px; font-family: var(--display); font-size: 24px; color: var(--hivis); }
+#helpCard dl { display: grid; grid-template-columns: auto 1fr; gap: 5px 14px; margin: 0; font-size: 14.5px; } #helpCard dt { font-family: var(--mono); color: var(--hivis); } #helpCard dd { margin: 0; }
+body.vision #game3d { filter: saturate(0.45) brightness(0.85); }
+#hotbar { display: flex; gap: 4px; }
+.slot { position: relative; width: 44px; height: 44px; padding: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 3px; display: grid; place-items: center; }
 .slot canvas { width: 38px; height: 38px; }
 .slot .k { position: absolute; left: 3px; top: 1px; font-family: var(--mono); font-size: 10px; color: var(--dim); }
 .slot .n { position: absolute; right: 3px; bottom: 1px; font-family: var(--mono); font-size: 12px; color: var(--hivis); }
@@ -193,6 +220,10 @@ select { max-width: 100%; }
 
 /* ---------- narrow screens ---------- */
 @media (max-width: 760px) {
+  #minimap { width: 120px; height: 120px; }
+  #aura { bottom: calc(150px + env(safe-area-inset-bottom, 0px)); width: 130px; } #auraVal { font-size: 20px; } #auraRank { display: none; }
+  #prompt .pt b { font-size: 15px; } #prompt { font-size: 13px; }
+  #radio { bottom: calc(146px + env(safe-area-inset-bottom, 0px)); }
   body { font-size: 13px; }
   #tl { width: 168px; padding: 7px 8px; gap: 4px; }
   #clock { font-size: 24px; }
@@ -243,7 +274,10 @@ body.touch #bottom { bottom: calc(6px + env(safe-area-inset-bottom, 0px)); }
     <div class="thin"><i id="stamFill"></i></div>
   </div>
   <div id="roomName"></div>
-  <ul id="obj"></ul>
+  <div id="objWrap"><div id="jobHint" hidden></div><ul id="obj"></ul></div>
+  <canvas id="minimap" width="400" height="400"></canvas>
+  <div id="aura" class="panel"><div class="lbl">AURA</div><div id="auraVal">0</div><div id="auraRank"></div></div>
+  <div id="auraPops"></div>
   <div id="flash"><div id="flashT"></div><div id="flashS"></div></div>
   <div id="toasts"></div>
   <div id="banner"></div>
@@ -262,9 +296,25 @@ body.touch #bottom { bottom: calc(6px + env(safe-area-inset-bottom, 0px)); }
   <div id="me" class="panel"><canvas id="face" width="96" height="96"></canvas><div class="lbl"><span>Will to live</span></div><div class="thin"><i id="willFill"></i></div><div id="pocket"></div></div>
 </div>
 
+<div id="helpCard" class="panel" hidden>
+  <h3>HOW TO BOUNCE</h3>
+  <dl>
+    <dt>Look around</dt><dd>Problems aren't marked until you notice them. Walk the floor, check the cameras (Tab), listen for crashes.</dd>
+    <dt>Markers</dt><dd>Known problems get a marker, a minimap blip, and a NEXT hint at the top right telling you how to fix it.</dd>
+    <dt>E</dt><dd>Talk, help, use. Patch up the injured, open stalls, put down wet floor signs.</dd>
+    <dt>Click</dt><dd>Grab someone and walk them to an exit. Pick things up. Hold it on a mess to mop or sweep.</dd>
+    <dt>Space</dt><dd>Shove. While dragging: peel fingers off furniture, throw them out at the door.</dd>
+    <dt>Look at them</dt><dd>Keep someone in your crosshair to stare them down. Many back off.</dd>
+    <dt>R (hold)</dt><dd>Read the room: see everyone's aura. Red means trouble.</dd>
+    <dt>Q · F · Tab</dt><dd>Radio backup · torch · security cameras.</dd>
+    <dt>Aura</dt><dd>Handle things cleanly and your aura grows, and people listen to you more. Slip on vomit and it drops.</dd>
+  </dl>
+  <p class="fine">H closes this. Scroll to zoom the camera. Click the game to lock the mouse.</p>
+</div>
+
 <div id="touch" hidden>
   <div id="joyBase" hidden><div id="joyKnob"></div></div>
-  <div id="tBtns"><button id="tTalk" class="big" type="button">TALK</button><button id="tShove" type="button">SHOVE</button><button id="tFlash" type="button">TORCH</button><button id="tRadio" type="button">RADIO</button><button id="tCam" type="button">CAMS</button></div>
+  <div id="tBtns"><button id="tTalk" class="big" type="button">TALK</button><button id="tUse" class="big" type="button">USE</button><button id="tShove" type="button">SHOVE</button><button id="tFlash" type="button">TORCH</button><button id="tRadio" type="button">RADIO</button><button id="tCam" type="button">CAMS</button><button id="tVis" type="button">AURA</button></div>
   <button id="tPause" type="button">PAUSE</button>
 </div>
 
@@ -285,23 +335,21 @@ body.touch #bottom { bottom: calc(6px + env(safe-area-inset-bottom, 0px)); }
     <div class="tag1">KEEP. THE. CLUB. FUNCTIONING.</div>
     <p class="blurb">You are Unit Four. It is 9 PM. Three hundred adults are about to stop making good decisions, and every one of them is your problem until the lights come on at four. Walk the floor. Notice things. Stare at people until they reconsider. Mop. Throw people out, physically, while they hold onto the furniture.</p>
     <dl class="ctrl keysonly">
-      <dt><kbd>WASD</kbd> <kbd>Shift</kbd></dt><dd>Walk, sprint</dd>
-      <dt>Mouse</dt><dd>Look. Hover on someone to stare them down.</dd>
-      <dt><kbd>E</kbd></dt><dd>Talk, open, interact</dd>
-      <dt><kbd>Click</kbd></dt><dd>Use tool: grab people, mop, place signs</dd>
-      <dt><kbd>Space</kbd></dt><dd>Shove. While dragging: peel fingers, throw out</dd>
-      <dt><kbd>1</kbd>–<kbd>9</kbd></dt><dd>Hands, mop, broom, wet floor sign, water, breathalyzer, zip ties, rope, first aid</dd>
-      <dt><kbd>Tab</kbd> <kbd>F</kbd> <kbd>Q</kbd></dt><dd>Cameras, torch, radio for backup</dd>
-      <dt><kbd>Z</kbd> <kbd>M</kbd> <kbd>Esc</kbd></dt><dd>Zoom, mute, pause</dd>
+      <dt><kbd>WASD</kbd> <kbd>Shift</kbd></dt><dd>Walk, sprint. Mouse looks (click to lock it). Scroll zooms.</dd>
+      <dt>Look at them</dt><dd>Keep someone in your crosshair to stare them down.</dd>
+      <dt><kbd>E</kbd></dt><dd>Talk, help, use. The bottom panel always says what E does.</dd>
+      <dt><kbd>Click</kbd></dt><dd>Grab people and walk them out. Pick things up. Hold on a mess to mop.</dd>
+      <dt><kbd>Space</kbd></dt><dd>Shove. While dragging: peel fingers, throw out at the door.</dd>
+      <dt><kbd>R</kbd></dt><dd>Hold to read the room: see who is trouble.</dd>
+      <dt><kbd>Q</kbd> <kbd>F</kbd> <kbd>Tab</kbd></dt><dd>Radio backup, torch, cameras.</dd>
+      <dt><kbd>H</kbd> <kbd>Esc</kbd></dt><dd>How to play, pause.</dd>
     </dl>
     <dl class="ctrl touchonly">
-      <dt>Left thumb</dt><dd>Drag on the lower left to walk. Push all the way to sprint.</dd>
-      <dt>Tap</dt><dd>Look at someone. Keep looking to stare them down. Uses mop, signs, water.</dd>
-      <dt>Double-tap</dt><dd>Grab someone with your hands. Double-tap again to let go.</dd>
-      <dt>TALK</dt><dd>Talk, open, interact</dd>
-      <dt>SHOVE</dt><dd>Shove. While dragging: peel fingers, throw out</dd>
-      <dt>Toolbar</dt><dd>Hands, mop, broom, wet floor sign, water, breathalyzer, zip ties, rope, first aid</dd>
-      <dt>TORCH · CAMS</dt><dd>Torch in the face. Security cameras. RADIO calls backup.</dd>
+      <dt>Left thumb</dt><dd>Walk. Push all the way to sprint.</dd>
+      <dt>Right side</dt><dd>Drag to look around. Tap someone to look at them. Keep looking to stare them down.</dd>
+      <dt>TALK · USE</dt><dd>The panel at the bottom says what they do right now. Hold USE on a mess to mop.</dd>
+      <dt>SHOVE · AURA</dt><dd>Shove (peel fingers while dragging). Hold AURA to see who is trouble.</dd>
+      <dt>TORCH · RADIO · CAMS</dt><dd>Torch, backup, security cameras.</dd>
     </dl>
     <div class="opts">
       <select id="nightSel" aria-label="Night"></select>
@@ -350,6 +398,12 @@ body.touch #bottom { bottom: calc(6px + env(safe-area-inset-bottom, 0px)); }
 <script src="js/world.js"></script>
 <script src="js/people.js"></script>
 <script src="js/render.js"></script>
+<script src="js/vendor/three.min.js"></script>
+<script src="js/vendor/three-extras.js"></script>
+<script src="js/r3d-core.js"></script>
+<script src="js/r3d-world.js"></script>
+<script src="js/r3d-people.js"></script>
+<script src="js/r3d-fx.js"></script>
 <script src="js/npc.js"></script>
 <script src="js/staff.js"></script>
 <script src="js/social.js"></script>
@@ -362,6 +416,7 @@ body.touch #bottom { bottom: calc(6px + env(safe-area-inset-bottom, 0px)); }
 <script src="js/events.js"></script>
 <script src="js/regulars.js"></script>
 <script src="js/audio.js"></script>
+<script src="js/guide.js"></script>
 <script src="js/hud.js"></script>
 <script src="js/cctv.js"></script>
 <script src="js/report.js"></script>

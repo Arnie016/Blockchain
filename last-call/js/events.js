@@ -13,7 +13,7 @@
 
   const WINDOWS = {
     birthday: [80, 200], influencer: [80, 300], crocodile: [230, 350], shots40: [170, 320], wedding: [110, 230], football: [140, 260],
-    bachelor: [160, 280], celebrity: [180, 300], fireAlarm: [240, 350], powerOut: [260, 350], lostPhone: [200, 330], proposal: [210, 330], ex: [180, 330],
+    bachelor: [160, 280], gang: [150, 300], teens: [90, 240], celebrity: [180, 300], fireAlarm: [240, 350], powerOut: [260, 350], lostPhone: [200, 330], proposal: [210, 330], ex: [180, 330],
   };
   Ev.schedule = (night) => {
     const g = G();
@@ -40,6 +40,37 @@
   };
 
   const EV = {};
+  // crews that walk straight past the queue
+  function crewIn(size, theme, kind, radio) {
+    const grp = themed(size, theme, { from: S.exits[U.randi(0, 1)] });
+    for (const m of grp.members) {
+      LC.Door.remove(m);
+      N.setTask(m, (function* () {
+        m.perm = P.GUEST | P.OUT;
+        yield* N.go(m, S.idCheck.x + U.rand(-20, 20), S.idCheck.y - 10, { perm: P.ALL, arrive: 20, hurry: true });
+        m.state = 'inside'; m.perm = P.GUEST; m.arrivedAt = G().clock;
+        yield* N.go(m, S.inside.x + U.rand(-30, 30), S.inside.y + U.rand(-20, 10), { arrive: 16 });
+      })(), 'arrive');
+    }
+    if (LC.Staff.marcus) N.shout(LC.Staff.marcus, U.pick(['OI! There is a QUEUE!', 'Hey— HEY!']));
+    LC.Radio.convo(radio);
+    setTimeout(() => {
+      const lead = grp.members.find((m) => !m.gone && m.state === 'inside');
+      if (!lead) return;
+      lead.incident = null;
+      const inc = I().start(kind, lead, { crew: grp.members.slice() });
+      if (inc) { for (const m of grp.members) if (m !== lead) { inc.others.push(m); m.incident = inc; } I().notice(inc, 'radio'); }
+    }, 9000);
+    return grp;
+  }
+  EV.gang = () => crewIn(U.randi(5, 6), {
+    look: (lk, i) => { lk.top = 'jacket'; lk.topC = '#16161c'; lk.topC2 = '#e8e8e8'; lk.bot = 'pants'; lk.botC = '#16161c'; lk.hat = i === 0 ? null : U.pick(['cap', 'beanie', null]); lk.chain = i === 0 || Math.random() < 0.5; lk.glasses = i === 0 ? 'sun' : null; lk.build = U.rand(1.1, 1.22); },
+    setup: (n, i) => { n.sob = U.rand(0.5, 0.7); n.tr.aggression = Math.min(1, n.tr.aggression + 0.4); n.tr.ego = Math.min(1, n.tr.ego + 0.4); if (i === 0) n.name = 'Big Mike'; },
+  }, 'gang', [['marcus', 'Unit Four, six lads just walked straight past the queue. Matching tracksuits.'], ['you', 'Did you stop them?'], ['marcus', 'There are six of them and one of me.']]);
+  EV.teens = () => crewIn(U.randi(3, 4), {
+    look: (lk, i) => { lk.height = U.rand(0.86, 0.93); lk.top = U.pick(['hoodie', 'tee', 'jersey']); lk.hat = U.pick(['cap', 'cap', 'bucket', null]); lk.beard = null; lk.build = 0.86; },
+    setup: (n, i) => { n.sob = U.rand(0.7, 0.9); n.flags.fakeId = true; n.flags.underage = true; },
+  }, 'teens', [['marcus', 'Four teenagers just sprinted past me. One of them had a fake moustache.'], ['you', 'A real one or a drawn one?'], ['marcus', 'Felt tip.']]);
   const themed = (size, theme, o = {}) => LC.Director.spawnGroup(size, Object.assign({ theme, from: S.exits[U.randi(0, 2)] }, o));
 
   /* ---------------- birthday ---------------- */

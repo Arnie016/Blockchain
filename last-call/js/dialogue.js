@@ -29,6 +29,7 @@
     else if (tag === 'HELP') p = 0.65;
     if ((n.stared || 0) > 1.2) p += 0.1;
     if (n.mood.anger > 0.7) p -= 0.15;
+    if (LC.Aura) p += LC.Aura.bonus();
     return U.clamp(p + bonus, 0.05, 0.95);
   };
   D.attempt = (n, tag, bonus) => Math.random() < D.chance(n, tag, bonus);

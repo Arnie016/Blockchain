@@ -15,9 +15,7 @@
       dialog: $('dialog'), dTitle: $('dTitle'), dInfo: $('dInfo'), dLine: $('dLine'), dOpts: $('dOpts'), dEsc: $('dEsc'), card: $('card'), banner: $('banner'),
       hotbar: $('hotbar'), will: $('willFill'), face: $('face'), pocket: $('pocket'),
     };
-    buildHotbar();
     el.dOpts.addEventListener('click', (e) => { const b = e.target.closest('button[data-i]'); if (b) LC.Dialogue.pick(+b.dataset.i); });
-    el.hotbar.addEventListener('click', (e) => { const b = e.target.closest('[data-tool]'); if (b) LC.Player.setTool(b.dataset.tool); });
   };
 
   /* ---------------- tool icons ---------------- */
@@ -39,6 +37,7 @@
     }
     return c;
   }
+  H.icon = icon;
   function buildHotbar() {
     el.hotbar.innerHTML = '';
     LC.Player.TOOLS.forEach((t, i) => {
@@ -80,6 +79,8 @@
     }
     el.dialog.hidden = false;
     document.body.classList.add('dlg');
+    // free the cursor so the options can be clicked
+    if (LC.Game.unlock) LC.Game.unlock();
   };
   function tagName(t) { return { CALM: 'CALM', WARN: 'WARN', OUT: 'THROW OUT', SNARK: 'SARCASM', HELP: 'HELP', ASK: 'ASK', TAKE: 'TAKE BRIBE' }[t] || t; }
   H.hideDialog = () => { el.dialog.hidden = true; dialogCtx = null; document.body.classList.remove('dlg'); if (el.card.dataset.kind === 'id') el.card.hidden = true; };
@@ -145,7 +146,7 @@
     const key = O.list.map((e) => e.title + e.where + e.done + e.reported).join('|');
     if (key !== lastObjKey) {
       lastObjKey = key;
-      el.obj.innerHTML = O.list.slice(0, 6).map((e) => '<li class="' + (e.done ? (e.ok ? 'done' : 'fail') : e.reported ? 'rep' : '') + '"><b>' + esc(e.title) + '</b><span>' + (e.done ? esc(e.payoff || '') : esc(e.where) + (e.reported ? ' · reported' : '')) + '</span></li>').join('');
+      el.obj.innerHTML = O.list.slice(0, 4).map((e) => '<li class="' + (e.done ? (e.ok ? 'done' : 'fail') : e.reported ? 'rep' : '') + '"><b>' + esc(e.title) + '</b><span>' + (e.done ? esc(e.payoff || '') : esc(e.where) + (e.reported ? ' · reported' : '')) + '</span></li>').join('');
     }
     // big flash
     const fl = O.flashes[0];
@@ -167,20 +168,7 @@
       el.radio.innerHTML = rl.map((r) => { const w = R.WHO[r.who] || { tag: r.who, c: '#fff' }; return '<li><i style="color:' + w.c + '">' + w.tag + '</i> ' + esc(r.text) + '</li>'; }).join('');
     }
     [...el.radio.children].forEach((li, i, a) => { const r = rl[i]; if (r) li.style.opacity = (0.45 + 0.55 * U.clamp(1 - (G.t - r.t) / 14, 0, 1)).toFixed(2); });
-    // hotbar
-    const hk = p.tool + JSON.stringify(p.inv) + !!p.grab + !!p.carry;
-    if (hk !== lastHotKey) {
-      lastHotKey = hk;
-      for (const b of el.hotbar.children) {
-        const t = LC.Player.toolDef(b.dataset.tool);
-        b.classList.toggle('sel', p.tool === t.id);
-        b.querySelector('.n').textContent = t.count ? p.inv[t.count] : '';
-        b.classList.toggle('empty', !!t.count && p.inv[t.count] <= 0);
-      }
-    }
-    // prompt
-    const pr = p.prompt || '';
-    if (pr !== lastPrompt) { lastPrompt = pr; el.prompt.textContent = pr; el.prompt.style.opacity = pr ? 1 : 0; }
+    if (LC.Guide) LC.Guide.update(dt);
     el.pocket.textContent = p.pocket.length ? 'Pockets: ' + p.pocket.map((i) => i.label).join(', ') : '';
     // sound cues fade
     for (const c of H.cues) c.t += dt;
@@ -221,16 +209,7 @@
       const tag = st.n.regular && LC.Regulars.label(st.n);
       if (tag && st.t > 0.6) { g.font = '800 13px "Big Shoulders Display", sans-serif'; g.textAlign = 'center'; g.fillStyle = '#ffd23f'; g.fillText(tag, s.x, s.y - 18); }
     }
-    // noticed troublemakers get a small chevron so you can find them in a crowd
-    for (const inc of LC.Incidents.active) {
-      if (!inc.noticed || !inc.n || inc.n.gone || inc.n.hidden) continue;
-      const n = inc.n;
-      const s = LC.R.toScreen(n.x, n.y, (n.z || 0) + 64);
-      if (s.x < 0 || s.x > LC.R.cw || s.y < 0 || s.y > LC.R.ch) continue;
-      const b = Math.sin(G.t * 5) * 2;
-      g.fillStyle = '#ff4d5a';
-      g.beginPath(); g.moveTo(s.x - 6, s.y - 8 + b); g.lineTo(s.x + 6, s.y - 8 + b); g.lineTo(s.x, s.y + b); g.closePath(); g.fill();
-    }
+    if (LC.Guide) LC.Guide.drawMarkers(g);
     // grip bar while they hold onto something
     if (p.grab && p.grab.anchor) {
       const n = p.grab.npc;
@@ -245,7 +224,8 @@
     for (const c of H.cues) {
       const cx = LC.R.cw / 2, cy = LC.R.ch / 2;
       const r = Math.min(cx, cy) - 40;
-      const x = cx + Math.cos(c.a) * r, y = cy + Math.sin(c.a) * r * 0.85;
+      let x = cx + Math.cos(c.a) * r, y = cy + Math.sin(c.a) * r * 0.85;
+      if (LC.R.edgePoint && c.x !== undefined) { const e = LC.R.edgePoint(c.x, c.y, 40, 80); x = e.x; y = e.y; }
       g.globalAlpha = Math.max(0, 1 - c.t / 1.8);
       g.font = '900 ' + (18 + c.t * 6).toFixed(0) + 'px "Big Shoulders Display", sans-serif';
       g.textAlign = 'center'; g.fillStyle = '#fff';

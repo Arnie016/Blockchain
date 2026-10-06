@@ -43,6 +43,7 @@
     const G = LC.G;
     if (!G || G.dialog) return;
     C.on = true;
+    if (LC.Game.unlock) LC.Game.unlock();
     root.hidden = false;
     C.focus(-1);
     LC.sfx('ui', 0, 0, { ui: true });

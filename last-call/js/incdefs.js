@@ -813,13 +813,15 @@
   /* ================= READ THE ROOM ================= */
   const CREEP = ['Can I buy you a drink?', "What's your star sign? Let me guess. Wrong.", "I'm actually a really nice guy.", 'Do you want to see me do the worm?', "You're like a... a... nice person.", "We should get married. Or a kebab."];
   D.harasser = {
-    title: (inc) => 'READ THE ROOM, ' + inc.n.name.toUpperCase(),
+    title: (inc) => U.pick(["HE WON'T TAKE THE HINT", 'BEING WEIRD TO WOMEN IS NOT A HOBBY, ' + inc.n.name.toUpperCase(), "SHE SAID NO. SHE SAID IT TWICE."]),
     timeout: 160, onTimeout(inc) { const v = inc.data.victim; I.fail(inc, 'victimLeft'); if (v && !v.gone && v.state === 'inside') N.setTask(v, N.tLeave(v), 'leave'); }, sub: 'Someone will not take the hint.', brief: 'bothering someone',
     sev: 2, min: 80, weight: 0.9, cooldown: 200, noticeR: 340, noticeT: 1.2,
     cand: (n) => (free(n) && n.tr.attraction > 0.55 && n.tr.social < 0.4 && drunk(n) > 0.3 ? 1 : 0),
     setup(inc) {
       const n = inc.n;
-      const vs = LC.G.npcs.filter((o) => o.kind === 'guest' && o !== n && o.group !== n.group && o.state === 'inside' && !o.override && !o.incident && U.dist(n.x, n.y, o.x, o.y) < 600);
+      let vs = LC.G.npcs.filter((o) => o.kind === 'guest' && o !== n && o.group !== n.group && o.state === 'inside' && !o.override && !o.incident && U.dist(n.x, n.y, o.x, o.y) < 600);
+      const women = vs.filter((o) => o.look && o.look.fem);
+      if (women.length) vs = women;
       if (!vs.length) return false;
       inc.data.victim = U.pick(vs);
     },
@@ -845,7 +847,7 @@
           // friends step in
           if (v.group && Math.random() < 0.4) { const f = v.group.members.find((m) => m !== v && !m.gone && m.state === 'inside' && U.dist(m.x, m.y, v.x, v.y) < 250 && !m.override); if (f && LC.Director.allow('argument')) LC.Social.startArgument(f, n, 'bump'); }
         }
-        if (t > 32 && !reported && !inc.noticed) { reported = true; reportToPlayer(v, inc, ['That guy will not leave me alone.', "Can you do something about him? He's following me.", 'There is a man. He keeps offering to do the worm.']); }
+        if (t > 16 && !reported && !inc.noticed) { reported = true; reportToPlayer(v, inc, ['That guy will not leave me alone.', "Can you do something about him? He's following me.", 'There is a man. He keeps offering to do the worm.']); }
         yield;
       }
     },
@@ -1373,5 +1375,175 @@
   };
 
   // what the director may start on its own
-  I.SCHEDULED = ['speaker', 'cone', 'plant', 'dj', 'vipSneak', 'drinkThief', 'harasser', 'smokeIndoors', 'weirdSeat', 'stoolCarry', 'vodkaJacket', 'tableDance', 'barDance', 'chandelier', 'airbnb', 'bottleThief', 'extinguisher', 'emergency', 'stallClimb', 'wrecker', 'signThief', 'lostShoe', 'lostFriend'];
+
+  /* ================= couples ================= */
+  const KISS_SPOTS = () => [
+    { x: S.emergencyIn.x, y: S.emergencyIn.y + 10, where: 'against the fire exit' },
+    { x: S.coat.x + 30, y: S.coat.y, where: 'in front of the coat check' },
+    { x: S.inside.x, y: S.inside.y - 20, where: 'in the middle of the entrance' },
+    { x: M.flamingo.cx + 30, y: M.flamingo.cy + 20, where: 'on the flamingo' },
+    { x: S.djTouch.x, y: S.djTouch.y, where: 'in the DJ booth' },
+    { x: S.vipIn.x + 20, y: S.vipIn.y, where: 'in the VIP doorway' },
+    { x: 13 * T, y: 29.5 * T, where: "outside the men's" },
+  ];
+  function partnerFor(n) {
+    const g = n.group;
+    const list = (g ? g.members : LC.G.npcs).filter((o) => o !== n && free(o) && U.dist(n.x, n.y, o.x, o.y) < 500);
+    return list.length ? U.pick(list) : null;
+  }
+  D.kissing = {
+    title: () => U.pick(['GET A ROOM. NOT THIS ONE.', 'PUBLIC DISPLAY OF AFFECTION, EXTREMELY PUBLIC', 'THEY HAVE BEEN KISSING FOR NINE MINUTES']),
+    sub: 'Two people are making out somewhere deeply inconvenient.', brief: 'snogging in the way',
+    sev: 1, min: 70, weight: 1.1, cooldown: 140, noticeR: 420, timeout: 170,
+    cand: (n) => (free(n) && drunk(n) > 0.35 ? 1 : 0),
+    setup(inc) {
+      const b = partnerFor(inc.n);
+      if (!b) return false;
+      inc.others.push(b); b.incident = inc;
+      inc.data.b = b;
+      const sp = U.pick(KISS_SPOTS());
+      inc.data.spot = sp;
+      inc.sub = 'Two people are making out ' + sp.where + '.';
+      inc.n.couple = b.couple = { on: true };
+    },
+    *script(n, inc) {
+      const b = inc.data.b, sp = inc.data.spot;
+      const perm = P.ALL;
+      N.setTask(b, (function* () { yield* N.go(b, sp.x + 14, sp.y, { perm, arrive: 10 }); while (I.alive(inc, b) && inc.state === 'active') { b.act = 'kiss'; N.faceTo(b, n.x, n.y); b.exprLock = true; b.expr = 'kiss'; yield; } b.exprLock = false; })(), 'inc:kissing', 3);
+      if (!(yield* N.go(n, sp.x - 14, sp.y, { perm, arrive: 10 }))) return;
+      let t = 0;
+      while (I.alive(inc, n) && !b.gone) {
+        t += G().dt;
+        n.act = 'kiss'; N.faceTo(n, b.x, b.y); n.exprLock = true; n.expr = 'kiss';
+        if (Math.random() < G().dt * 1.2) Wd.part('heart', (n.x + b.x) / 2, n.y, { z: 46, vx: U.rand(-10, 10), vy: U.rand(-6, 6) });
+        if (Math.random() < G().dt * 0.08) { LC.stat('customerComplaints'); const w = LC.G.npcs.find((o) => o.kind === 'guest' && !o.override && o !== n && o !== b && U.dist(o.x, o.y, n.x, n.y) < 120); if (w) N.say(w, U.pick(['Oh come ON.', 'Some of us are trying to get past.', 'Ew. Romantic, but ew.', 'I can hear it. I can HEAR it.']), { pri: 1 }); }
+        if (b.escorted || n.escorted) { I.resolve(inc, 'separate', 'Separated. The romance can continue at a bus stop.'); return; }
+        yield;
+      }
+    },
+    cleanup(n, inc) { n.exprLock = false; n.couple = null; const b = inc.data.b; if (b && !b.gone) { b.exprLock = false; b.couple = null; if (b.taskName === 'inc:kissing') N.cancelTask(b); } },
+    talk: () => ({
+      open: ['Mmmf?', "We're in LOVE.", 'Do you MIND?', 'We met forty minutes ago.'],
+      opts: [
+        { text: 'Get a room.', tag: 'SNARK', yes: ['We HAVE a room. This one.', '...fine. Ugh.'] },
+        { text: 'Not here. Move along.', tag: 'WARN' },
+        { text: "You're blocking the fire exit. And my will to live.", tag: 'SNARK', yes: ['...that is fair.'] },
+        { text: 'Out. Both of you.', tag: 'OUT' },
+      ],
+    }),
+    stare: { t1: 0.7, t2: 1.8, t3: 3.0, l1: ['...'], l2: ["...he's staring.", 'Is he WATCHING us?'], look: (inc, n) => n.face + Math.PI, resume: ['*resumes kissing*'] },
+    resolved: { any: ['Separated. Love will find a less stupid place.'], stare: ['Stared at them until it got weird. It worked.'], eject: ['Thrown out together. Romantic, in a way.'] },
+    failed: ['Still at it. Management has asked if they are part of the decor.'],
+  };
+
+  D.breakup = {
+    title: (inc) => U.pick(["IT'S OVER, " + inc.n.name.toUpperCase(), 'A BREAKUP. LIVE. ON THE DANCE FLOOR.', 'THEY ARE BREAKING UP AND EVERYONE IS WATCHING']),
+    sub: 'A couple is breaking up very loudly. Drinks are at risk.', brief: 'breaking up loudly',
+    sev: 2, min: 110, weight: 0.9, cooldown: 200, noticeR: 520, timeout: 120,
+    cand: (n) => (free(n) && drunk(n) > 0.4 && n.mood ? 1 : 0),
+    setup(inc) {
+      const b = partnerFor(inc.n);
+      if (!b) return false;
+      inc.others.push(b); b.incident = inc; inc.data.b = b;
+    },
+    *script(n, inc) {
+      const b = inc.data.b;
+      const A = ['You LIKED her post.', 'You said you were at your MUM\'S.', 'This is about the fish, isn\'t it?', 'I CANNOT do this anymore.', 'You ALWAYS do this.', 'I gave you the GOOD seat at the cinema!'];
+      const B2 = ['It was ONE like!', 'Are we doing this HERE?', 'Can we not do this in a nightclub?', 'Fine! FINE!', "I'm not crying, YOU'RE crying."];
+      N.setTask(b, (function* () { while (I.alive(inc, b) && inc.state === 'active') { b.act = 'argue'; N.faceTo(b, n.x, n.y); yield; } })(), 'inc:breakup', 3);
+      let t = 0, lt = 0.5, thrown = false;
+      while (I.alive(inc, n) && !b.gone) {
+        t += G().dt; lt -= G().dt;
+        if (U.dist(n.x, n.y, b.x, b.y) > 40) N.goTo(n, b.x, b.y + 20, { arrive: 26 }); else { N.stop(n); N.faceTo(n, b.x, b.y); }
+        n.act = t > 25 ? 'cry' : 'argue';
+        n.exprLock = true; n.expr = t > 25 ? 'cry' : 'furious';
+        if (lt < 0) { lt = U.rand(2.4, 4); if (Math.random() < 0.55) N.shout(n, U.pick(A)); else N.shout(b, U.pick(B2)); }
+        if (!thrown && t > 18 && n.drink) { thrown = true; N.spillDrink(n, Math.atan2(b.y - n.y, b.x - n.x), 1); N.shout(b, 'MY HAIR!'); LC.Social.noise(b.x, b.y, 'glass', 1); }
+        if (Math.random() < G().dt * 0.3) { const w = LC.G.npcs.find((o) => o.kind === 'guest' && !o.override && o !== n && o !== b && U.dist(o.x, o.y, n.x, n.y) < 160); if (w) { N.faceTo(w, n.x, n.y); N.say(w, U.pick(['Oh this is GOOD.', 'Is someone filming?', '*eats popcorn that came from nowhere*', 'Team her.', 'Team him.']), { pri: 1 }); } }
+        if (b.escorted || n.escorted) { I.resolve(inc, 'separate', 'Walked one of them away. Both are texting their friends about you.'); return; }
+        yield;
+      }
+    },
+    cleanup(n, inc) { n.exprLock = false; const b = inc.data.b; if (b && !b.gone && b.taskName === 'inc:breakup') N.cancelTask(b); },
+    onTimeout(inc) { const n = inc.n; I.fail(inc, 'timeout', 'One of them is now crying in the toilets. For the rest of the night.'); if (n && !n.gone) { N.setTask(n, N.tPee(n), 'pee'); n.flags.crying = true; } },
+    talk: () => ({
+      open: ['STAY OUT OF THIS.', 'Tell him he is WRONG.', 'Whose side are you on?!', 'Do you think it was ONE like?'],
+      opts: [
+        { text: 'Take a minute. Separately.', tag: 'CALM', yes: ['...yeah. Yeah. Okay.', 'I need a drink. Water. Fine.'] },
+        { text: 'Maybe not on the dance floor?', tag: 'WARN' },
+        { text: 'It was probably about the fish.', tag: 'SNARK', yes: ['...it WAS about the fish.'] },
+        { text: 'Somebody is going home. Now.', tag: 'OUT' },
+      ],
+    }),
+    resolved: { any: ['Separated. They will get back together on Tuesday.'], eject: ['One of them left. The other one is fine. Mostly.'] },
+    failed: ['Nobody stepped in. It got worse. It always gets worse.'],
+  };
+
+  /* ================= groups that turn up looking for trouble ================= */
+  D.gang = {
+    title: () => U.pick(['THE LADS HAVE ARRIVED', 'THEY SAY THEY RUN THIS BLOCK', 'SIX MEN IN MATCHING TRACKSUITS']),
+    sub: 'A rowdy crew skipped the queue and wants free drinks.', brief: 'running the gang',
+    sev: 3, min: 0, weight: 0, noticeR: 600, timeout: 160, loud: true,
+    *script(n, inc) {
+      const crew = inc.data.crew;
+      const bar = U.pick(S.bar);
+      for (const m of crew) if (m !== n) N.setTask(m, (function* () { while (I.alive(inc, n) && !m.gone) { if (U.dist(m.x, m.y, n.x, n.y) > 50) N.goTo(m, n.x + U.rand(-40, 40), n.y + U.rand(-30, 30), { arrive: 20 }); else { m.act = 'crossed'; N.faceTo(m, n.x, n.y + 60); } if (Math.random() < G().dt * 0.12) N.shout(m, U.pick(['WE RUN THIS.', 'Whose club? OUR club.', 'Big Mike says hello.', 'You looking at me?', 'Free drinks or what?'])); yield; } })(), 'inc:gang', 3);
+      yield* N.go(n, bar.x, bar.y + 30, { arrive: 20 });
+      let t = 0;
+      while (I.alive(inc, n)) {
+        t += G().dt;
+        n.act = 'argue'; N.faceTo(n, bar.x, bar.y - 60);
+        if (Math.random() < G().dt * 0.25) N.shout(n, U.pick(["Put it on Big Mike's tab.", 'There is no tab? There is NOW.', 'Six shots. On the house. We ARE the house.', 'Do you know who I am? Neither do I. But FEAR it.']));
+        if (Math.random() < G().dt * 0.05 && LC.Director.allow('argument')) { const v = LC.G.npcs.find((o) => free(o) && U.dist(o.x, o.y, n.x, n.y) < 160); const m = U.pick(crew.filter((q) => !q.gone && q !== n)); if (v && m) LC.Social.startArgument(m, v, 'bump'); }
+        if (Math.random() < G().dt * 0.1) LC.stat('customerComplaints');
+        yield;
+      }
+    },
+    onTimeout(inc) { I.fail(inc, 'took over', 'They took over the bar. Jolene served them out of fear. Management is "reviewing".'); for (const m of inc.data.crew) if (!m.gone && m.state === 'inside') N.setTask(m, N.tLeave(m, { noCoat: true }), 'leave'); LC.stat('clubDamage', 400); },
+    onResolve(inc) { const left = inc.data.crew.filter((m) => !m.gone && m !== inc.n && m.state === 'inside'); left.forEach((m, i) => setTimeout(() => { if (!m.gone && m.state === 'inside') { N.say(m, U.pick(['This club is MID.', 'We were leaving anyway.', 'Wait for us, Mike!'] ), { pri: 2 }); N.setTask(m, N.tLeave(m, { noCoat: true }), 'leave'); } }, 600 + i * 500)); },
+    talk: () => ({
+      open: ['You must be new.', 'We know the owner. We ARE the owner. Spiritually.', 'Walk away, security.'],
+      opts: [
+        { text: 'You can leave, or you can leave quickly.', tag: 'WARN', bonus: -0.15 },
+        { text: 'Big Mike? Is that because of your coat?', tag: 'SNARK', bonus: -0.1 },
+        { text: "Drinks are for paying customers. You're neither.", tag: 'CALM', bonus: -0.2 },
+        { text: 'Out. The lot of you.', tag: 'OUT' },
+      ],
+    }),
+    comply(inc) { I.resolve(inc, 'talk', 'Big Mike backed down. In front of his whole crew. That is going to sting.'); const n = inc.n; if (n && !n.gone) N.setTask(n, N.tLeave(n, { noCoat: true }), 'leave'); },
+    resolved: { any: ['The crew is gone. The bar staff exhale.'], eject: ['Big Mike thrown out. The crew followed him like ducklings.'] },
+    failed: ['They ran the place for a bit. Nobody liked it.'],
+  };
+  D.teens = {
+    title: () => U.pick(['THESE ARE CHILDREN', 'THEY ARE SEVENTEEN AT MOST', 'FOUR TEENAGERS IN A TRENCH COAT, BASICALLY']),
+    sub: 'A gang of teenagers got in with terrible fake IDs.', brief: 'definitely not 18',
+    sev: 2, min: 0, weight: 0, noticeR: 480, timeout: 170,
+    *script(n, inc) {
+      const crew = inc.data.crew;
+      for (const m of crew) if (m !== n) N.setTask(m, (function* () { while (I.alive(inc, n) && !m.gone) { if (U.dist(m.x, m.y, n.x, n.y) > 46) N.goTo(m, n.x + U.rand(-36, 36), n.y + U.rand(-26, 26), { arrive: 18 }); else { m.act = Math.sin(LC.G.t + m.seed * 9) > 0 ? 'phone' : 'smoke'; m.phoneUp = m.act === 'phone'; m.filming = m.phoneUp; if (m.act === 'smoke' && Math.random() < G().dt * 2) Wd.part('vape', m.x + 6, m.y, { z: 44, size: 1.2 }); } if (Math.random() < G().dt * 0.1) N.say(m, U.pick(['This is SO sick.', 'Get me in the video!', 'Is that a real bouncer?', 'Act natural. ACT NATURAL.', 'My mum thinks I am at revision club.'])); yield; } m.phoneUp = false; m.filming = false; })(), 'inc:teens', 3);
+      const bar = U.pick(S.bar);
+      yield* N.go(n, bar.x, bar.y + 30, { arrive: 20 });
+      while (I.alive(inc, n)) {
+        n.act = 'argue'; N.faceTo(n, bar.x, bar.y - 60);
+        if (Math.random() < G().dt * 0.22) N.say(n, U.pick(['Four Jägerbombs. We are eighteen. Combined, we are seventy-two.', 'I have a beard. Look. LOOK at it.', 'Can we get a drink with an umbrella in it?', "I'm literally an adult. I pay for Spotify."]), { pri: 2 });
+        yield;
+      }
+    },
+    onTimeout(inc) { I.fail(inc, 'served', 'Someone served them. Somebody\'s mum is going to ring the club. Tomorrow. At 8 AM.'); LC.stat('securityComplaints'); for (const m of inc.data.crew) if (!m.gone && m.state === 'inside') N.setTask(m, N.tLeave(m, { noCoat: true }), 'leave'); },
+    onResolve(inc) { inc.data.crew.filter((m) => !m.gone && m !== inc.n && m.state === 'inside').forEach((m, i) => setTimeout(() => { if (!m.gone && m.state === 'inside') { N.say(m, U.pick(["I'm telling my MUM.", 'This is so unfair.', 'We were going anyway, this place is cringe.']), { pri: 2 }); N.setTask(m, N.tLeave(m, { noCoat: true }), 'leave'); } }, 500 + i * 400)); },
+    talk: () => ({
+      open: ['We are adults.', "Hello fellow adult.", "We're twenty-five. All of us.", 'Is this the over-18s?'],
+      opts: [
+        { text: 'What year were you born?', tag: 'SNARK', say: 'What year were you born? Quickly.', yes: ['...2009. I mean. 1990. Something.'] },
+        { text: 'Your ID says your name is Adult Man.', tag: 'SNARK', yes: ['...it was ten pounds.'] },
+        { text: 'Go home. Revise.', tag: 'WARN', bonus: 0.15 },
+        { text: 'Out. Now. All of you.', tag: 'OUT' },
+      ],
+    }),
+    comply(inc) { I.resolve(inc, 'talk', 'Sent home. They will tell everyone at school it was "mid".'); const n = inc.n; if (n && !n.gone) N.setTask(n, N.tLeave(n, { noCoat: true }), 'leave'); },
+    resolved: { any: ['The children have left the building.'], eject: ['Walked out the leader. The rest followed, filming.'] },
+    failed: ['They stayed. They were served. Nobody is proud of tonight.'],
+  };
+
+  I.SCHEDULED = ['kissing', 'breakup', 'speaker', 'cone', 'plant', 'dj', 'vipSneak', 'drinkThief', 'harasser', 'smokeIndoors', 'weirdSeat', 'stoolCarry', 'vodkaJacket', 'tableDance', 'barDance', 'chandelier', 'airbnb', 'bottleThief', 'extinguisher', 'emergency', 'stallClimb', 'wrecker', 'signThief', 'lostShoe', 'lostFriend'];
 })();
