@@ -149,9 +149,11 @@
   const KEYNAME = { CLICK: 'CLICK', HOLD: 'HOLD CLICK', SPACE: 'SPACE', LOOK: 'LOOK', E: 'E', X: 'X', B: 'B', Q: 'Q' };
   const TKEY = { CLICK: 'USE', HOLD: 'HOLD USE', SPACE: 'SHOVE', E: 'TALK', LOOK: 'LOOK', X: 'X', Q: 'RADIO' };
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+  let hb = false;
   Gd.update = (dt) => {
     const G = LC.G, p = G.player;
     if (!p) return;
+    if (!hb) { hb = true; const el = $('hotbar'); el.style.pointerEvents = 'auto'; const go = (e) => { const b = e.target.closest('[data-k]'); if (b) { e.preventDefault(); LC.Fun.use(+b.dataset.k); } }; el.addEventListener('click', go); el.addEventListener('touchstart', go, { passive: false }); }
     const R3 = LC.R3;
     // vision: hold R
     const want = LC.Input.keys.has('KeyR') || LC.Input.vision ? 1 : 0;
@@ -173,13 +175,16 @@
         '<div class="pa">' + ctx.acts.map((a) => '<span><kbd>' + (touch ? TKEY[a.key] || a.key : KEYNAME[a.key] || a.key) + '</kbd>' + esc(a.label) + '</span>').join('') + '</div>';
     } else if (!G.dialog && G.t < 240 && !G.demo) html = '<div class="pa dim"><span><kbd>WASD</kbd>walk</span><span><kbd>MOUSE</kbd>look</span><span><kbd>R</kbd>read the room</span><span><kbd>H</kbd>help</span></div>';
     if (html !== lastPrompt) { lastPrompt = html; const el = $('prompt'); el.innerHTML = html; el.style.opacity = html ? 1 : 0; }
-    // kit
-    const kit = JSON.stringify(p.inv);
+    // toolbar 1-5 + kit counts
+    const tb = LC.Fun ? LC.Fun.TOOLS.map((t) => t.id + Math.ceil(LC.Fun.cooldown(t.id))).join() : '';
+    const kit = JSON.stringify(p.inv) + tb;
     if (kit !== lastKit) {
       lastKit = kit;
-      const items = [['water', 'Water', 'water'], ['aid', 'First aid', 'aid'], ['sign', 'Wet floor signs', 'sign'], ['zip', 'Zip ties (X)', 'zip'], ['rope', 'Rope (B)', 'rope']];
-      $('hotbar').innerHTML = items.map(([k, label, ic]) => '<div class="slot' + (p.inv[k] <= 0 ? ' empty' : '') + '" title="' + label + '" data-ic="' + ic + '"><span class="n">' + p.inv[k] + '</span></div>').join('');
-      for (const d of $('hotbar').children) { const c = LC.HUD.icon(d.dataset.ic); d.prepend(c); }
+      const ICON = { tape: '⛔', zone: '◎', horn: '📢', backup: '🛡', clear: '✖' };
+      const tools = LC.Fun ? LC.Fun.TOOLS.map((t) => { const c = Math.ceil(LC.Fun.cooldown(t.id)); return '<div class="slot tool' + (c ? ' empty' : '') + '" data-k="' + t.k + '" title="' + t.name + ' — ' + t.hint + '"><span class="k">' + t.k + '</span><span class="ic">' + ICON[t.id] + '</span><span class="nm">' + t.name + '</span>' + (c ? '<span class="cd">' + c + '</span>' : '') + '</div>'; }).join('') : '';
+      const items = [['water', 'Water'], ['aid', 'First aid'], ['sign', 'Wet floor signs'], ['zip', 'Zip ties (X)']];
+      $('hotbar').innerHTML = tools + '<span class="sep"></span>' + items.map(([k, label]) => '<div class="slot' + (p.inv[k] <= 0 ? ' empty' : '') + '" title="' + label + '" data-ic="' + k + '"><span class="n">' + p.inv[k] + '</span></div>').join('');
+      for (const d of $('hotbar').querySelectorAll('[data-ic]')) d.prepend(LC.HUD.icon(d.dataset.ic));
     }
     // aura
     const av = Math.round(G.aura || 0);
@@ -234,6 +239,8 @@
     const wp = (x, y) => [x / T * MS, y / T * MS];
     // staff
     for (const c of G.npcs) { if (c.kind !== 'staff' && !c.police) continue; const [x, y] = wp(c.x, c.y); g.fillStyle = c.police ? '#4a7aff' : '#5ab8ff'; g.beginPath(); g.arc(x, y, 3, 0, 7); g.fill(); }
+    // exits
+    if (LC.Fun) for (const d of LC.Fun.exits()) { const [x, y] = wp(d.cx, d.cy); g.fillStyle = '#3dff8a'; g.fillRect(x - 5, y - 5, 10, 10); g.fillStyle = '#002a10'; g.font = 'bold 9px sans-serif'; g.textAlign = 'center'; g.fillText('X', x, y + 3); }
     // vision shows the crowd
     if (Gd.vision > 0.3) for (const c of G.npcs) { if (c.kind !== 'guest' || c.state !== 'inside') continue; const cat = Gd.category(c); if (cat === 'fine') continue; const [x, y] = wp(c.x, c.y); g.fillStyle = cat === 'trouble' ? '#ff4d5a' : cat === 'love' ? '#ff6fb8' : cat === 'drunk' ? '#ffd23f' : '#ff9a3a'; g.fillRect(x - 1.5, y - 1.5, 3, 3); }
     g.restore();

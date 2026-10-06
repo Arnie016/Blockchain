@@ -26,6 +26,7 @@
     if (state !== 'play') { if (state === 'pause' && (k === 'Escape' || k === 'KeyP')) resume(); return; }
     const G = LC.G;
     if (G.dialog && /^Digit[1-4]$/.test(k)) { LC.Dialogue.pick(+k.slice(5) - 1); In.pressed.delete(k); return; }
+    if (!G.dialog && /^Digit[1-5]$/.test(k) && LC.Fun) { LC.Fun.use(+k.slice(5)); return; }
     switch (k) {
       case 'Tab': LC.CCTV.toggle(); break;
       case 'Escape': if (G.dialog) LC.Dialogue.close(); else if (LC.CCTV.isOpen()) LC.CCTV.close(); else pause(); break;
@@ -195,6 +196,7 @@
       functioning: 100, stats: {}, dialog: null, player: null, phaseName: '', aura: 0,
     });
     resetWorld();
+    if (LC.Fun) LC.Fun.reset();
     LC.Staff.spawn();
     LC.Player.create(PLAYER_LOOKS[settings.look % PLAYER_LOOKS.length]);
     LC.Director.start(G);
@@ -238,6 +240,7 @@
     guard('regulars', LC.Regulars.update, dt);
     guard('radio', LC.Radio.update, dt);
     guard('dialogue', LC.Dialogue.update, dt);
+    if (LC.Fun) guard('fun', LC.Fun.update, dt);
     if (G.vipRopeOpen && G.vipRopeT && G.t > G.vipRopeT) { G.vipRopeOpen = 0; G.vipRopeT = 0; }
     const p = G.player;
     if (p && !G.demo) {
@@ -346,6 +349,12 @@
     else { target.esc = Math.max(target.esc || 1, 5); if (target.incident) LC.Incidents.escalate(target.incident, 5); }
   }
   Game.callBackup = callBackup;
+  Game.callBackupAt = (x, y) => {
+    const G = LC.G;
+    const t = G.npcs.filter((n) => n.kind === 'guest' && n.state === 'inside' && U.dist(n.x, n.y, x, y) < 120).sort((a, b) => (!!b.incident - !!a.incident) || U.dist(a.x, a.y, x, y) - U.dist(b.x, b.y, x, y))[0];
+    const b = LC.Staff.callBackup(x, y, t || null, t && (t.incident || LC.Social.fightOf(t)) ? 'eject' : 'assist');
+    LC.Radio.convo(b ? [['you', 'Backup, where I am looking.'], [b.name === 'Tank' ? 'tank' : 'priya', U.pick(['Moving.', 'On it.', 'Eyes on.'])]] : [['you', 'Backup?'], ['marcus', 'Everyone is busy.']]);
+  };
 
   /* ================= screens ================= */
   function toggleMute() {

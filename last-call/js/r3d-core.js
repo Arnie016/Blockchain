@@ -653,6 +653,7 @@
     bloom.strength = U.lerp(0.95, 0.35, on);
     scene.fog.density = U.lerp(0.032, 0.012, on);
     scene.fog.color.copy(R3.col(on > 0.5 ? '#2a2a30' : '#0b0814'));
+    if (G.redDeath && !G.redDeath.over) { scene.fog.color.copy(R3.col('#3a0408')); scene.fog.density = 0.045; gu.uTint.value.set(1.15, 0.82, 0.82); } else gu.uTint.value.set(1, 1, 1);
     if (!(hooks && hooks.skip)) {
       composer.render();
       // auto quality: sustained slow frames step the resolution down

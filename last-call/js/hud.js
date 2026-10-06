@@ -210,6 +210,7 @@
       if (tag && st.t > 0.6) { g.font = '800 13px "Big Shoulders Display", sans-serif'; g.textAlign = 'center'; g.fillStyle = '#ffd23f'; g.fillText(tag, s.x, s.y - 18); }
     }
     if (LC.Guide) LC.Guide.drawMarkers(g);
+    if (LC.Fun) LC.Fun.drawOverlay(g);
     // grip bar while they hold onto something
     if (p.grab && p.grab.anchor) {
       const n = p.grab.npc;

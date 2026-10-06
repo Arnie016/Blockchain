@@ -52,8 +52,8 @@ button:focus-visible, select:focus-visible { outline: 2px solid var(--hivis); ou
 #obj li.fail span { color: var(--bad); }
 @keyframes slideIn { from { transform: translateX(20px); opacity: 0; } }
 
-#flash { position: absolute; left: 50%; top: 17%; transform: translateX(-50%); text-align: center; opacity: 0; width: min(92vw, 820px); }
-#flashT { font-family: var(--display); font-weight: 900; font-size: clamp(28px, 5.2vw, 58px); line-height: 0.95; letter-spacing: 0.01em; color: #fff; text-shadow: 0 0 22px rgba(255, 61, 154, 0.55), 0 4px 0 #000, 0 6px 20px #000; text-wrap: balance; }
+#flash { position: absolute; left: 50%; top: 11%; transform: translateX(-50%); text-align: center; opacity: 0; width: min(92vw, 820px); }
+#flashT { font-family: var(--display); font-weight: 900; font-size: clamp(22px, 3.2vw, 38px); line-height: 0.95; letter-spacing: 0.01em; color: #fff; text-shadow: 0 0 22px rgba(255, 61, 154, 0.55), 0 4px 0 #000, 0 6px 20px #000; text-wrap: balance; }
 #flashS { margin-top: 8px; font-size: clamp(14px, 1.8vw, 18px); color: var(--hivis); text-shadow: 0 2px 6px #000; font-weight: 600; }
 #toasts { position: absolute; left: 50%; top: 34%; transform: translateX(-50%); display: grid; gap: 6px; width: min(92vw, 560px); }
 .toast { background: var(--panel2); border: 1px solid var(--line); border-left: 4px solid var(--ok); padding: 8px 12px; display: grid; gap: 2px; }
@@ -106,6 +106,13 @@ body.vision #game3d { filter: saturate(0.45) brightness(0.85); }
 .slot .n { position: absolute; right: 3px; bottom: 1px; font-family: var(--mono); font-size: 12px; color: var(--hivis); }
 .slot.sel { border-color: var(--hivis); box-shadow: 0 0 0 1px var(--hivis) inset, 0 0 14px rgba(255, 210, 63, 0.35); background: rgba(40, 32, 8, 0.85); }
 .slot.empty canvas { opacity: 0.35; }
+.slot.tool { width: 64px; background: rgba(30,10,40,0.85); }
+.slot.tool .ic { font-size: 20px; line-height: 1; }
+.slot.tool .nm { position: absolute; bottom: 1px; left: 0; right: 0; font-size: 9px; text-align: center; color: var(--dim); white-space: nowrap; overflow: hidden; }
+.slot.tool .k { color: var(--hivis); font-size: 11px; }
+.slot.tool .cd { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(0,0,0,0.6); font-family: var(--mono); color: #fff; }
+.slot.empty .ic { opacity: 0.4; }
+#hotbar .sep { width: 8px; }
 
 #dialog { width: 100%; padding: 10px; pointer-events: auto; display: grid; gap: 7px; border-top: 3px solid var(--hivis); }
 #dHead { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
@@ -416,6 +423,7 @@ body.touch #bottom { bottom: calc(6px + env(safe-area-inset-bottom, 0px)); }
 <script src="js/events.js"></script>
 <script src="js/regulars.js"></script>
 <script src="js/audio.js"></script>
+<script src="js/fun.js"></script>
 <script src="js/guide.js"></script>
 <script src="js/hud.js"></script>
 <script src="js/cctv.js"></script>

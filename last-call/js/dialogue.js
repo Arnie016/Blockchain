@@ -54,6 +54,7 @@
     if (!built && n.flags.banned && n.state === 'inside') built = bannedTalk(ctx);
     if (!built && LC.G.closing) built = closingTalk(ctx);
     if (!built && (1 - n.sob) > 0.72) built = drunkTalk(ctx);
+    if (!built && LC.Fun && Math.random() < 0.75) built = LC.Fun.chat(ctx, n);
     if (!built) normalTalk(ctx);
     if (!ctx.opts.length) return;
     G.dialog = ctx;
